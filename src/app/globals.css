@@ -1,8 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #060810;
+  --foreground: #f1f5f9;
+  --muted: #94a3b8;
+  --border: rgba(255, 255, 255, 0.09);
+  --glass: rgba(255, 255, 255, 0.045);
+  --accent: #6366f1;
+  --accent-2: #ec4899;
 }
 
 @theme inline {
@@ -12,15 +17,95 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--border);
+}
+
+html {
+  color-scheme: dark;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  position: relative;
+  isolation: isolate;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(60rem 40rem at 12% -10%, rgba(99, 102, 241, 0.28), transparent 60%),
+    radial-gradient(50rem 35rem at 110% 10%, rgba(236, 72, 153, 0.22), transparent 55%),
+    radial-gradient(45rem 40rem at 50% 120%, rgba(5, 150, 105, 0.16), transparent 55%),
+    #060810;
+}
+
+.glass-card {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.glow-text {
+  background: linear-gradient(120deg, #a5b4fc, #f0abfc 45%, #fca5a5 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.glow-btn {
+  position: relative;
+  isolation: isolate;
+}
+
+.glow-btn::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: inherit;
+  filter: blur(14px);
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+
+.glow-btn:hover::after {
+  opacity: 0.85;
+}
+
+@keyframes spin-slow {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(0.9);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 0.6s linear infinite;
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 5s ease-in-out infinite;
 }

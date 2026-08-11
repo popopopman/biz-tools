@@ -1,0 +1,70 @@
+# mainブランチへのpushをトリガーに、Next.jsの静的書き出し(out/)を
+# GitHub Pagesへ自動デプロイするワークフロー。
+# リポジトリの Settings → Pages → Source を「GitHub Actions」にしておくこと。
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # Actionsタブから手動実行できるようにしておく。
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同時に複数のデプロイが走らないようにする(進行中のデプロイは中断せず待つ)。
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build (static export)
+        run: pnpm build
+        env:
+          # next.config.ts がこのフラグを見て basePath(/biz-tools) を付与する。
+          GITHUB_PAGES: "true"
+          NEXT_PUBLIC_ADSENSE_CLIENT: ${{ secrets.ADSENSE_CLIENT }}
+
+      - name: Add .nojekyll
+        # GitHub PagesがデフォルトのJekyll処理で `_next` 等の
+        # アンダースコア始まりのファイルを無視してしまうのを防ぐ。
+        run: touch out/.nojekyll
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,31 @@
+services:
+  dev:
+    build:
+      context: .
+      target: dev
+    ports:
+      - "3100:3000"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - next_cache:/app/.next
+      - pnpm_store:/pnpm/store
+    environment:
+      - WATCHPACK_POLLING=true
+    command: pnpm dev
+
+  preview:
+    build:
+      context: .
+      target: preview
+      args:
+        GITHUB_PAGES: "false"
+    ports:
+      - "8080:80"
+    profiles:
+      - preview
+
+volumes:
+  node_modules:
+  next_cache:
+  pnpm_store:
