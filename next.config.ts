@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
   // GitHub Pagesは静的ファイルしか配信できないため、Next.jsのサーバー機能を使わず
   // 完全に静的なHTML/CSS/JSとして書き出す(`next build` の出力先は `out/`)。
   output: "export",
+  // trueにすると各ルートが `dice.html` ではなく `dice/index.html` として
+  // 書き出される。サイト内のリンクは全て末尾スラッシュ付き(例: "/dice/")で
+  // 統一しているため、これがないとGitHub Pages上で404になってしまう。
+  trailingSlash: true,
   basePath,
   assetPrefix: basePath ? `${basePath}/` : undefined,
   images: {
