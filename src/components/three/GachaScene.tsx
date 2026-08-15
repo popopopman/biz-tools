@@ -90,10 +90,6 @@ const METEOR_TRAIL_LAG = 0.05; // 尾を引く各セグメントの、頭から�
 // 間隔を詰めて連ねることで、粒の連なりではなく1本の煙の尾のように見せる。
 const DUST_TRAIL_COUNT = 10;
 const DUST_TRAIL_LAG = 0.045;
-// 突き刺さった隕石の周りに散らばる、破片のような小さな岩。
-const DEBRIS_PER_IMPACT = 4;
-const DEBRIS_COUNT = (DECOY_COUNT + 1) * DEBRIS_PER_IMPACT;
-const DEBRIS_RADIUS = 0.1;
 
 // おとり隕石の発生位置をランダムに1つ決める(呼び出しはuseEffect内のみで、レンダー中には呼ばない)。
 function randomDecoyStart(): THREE.Vector3 {
@@ -541,9 +537,6 @@ function GachaRig({
   const craterImpacts = useRef<CraterImpact[]>([]);
   const craterAppliedDecoy = useRef<boolean[]>(Array.from({ length: DECOY_COUNT }, () => false));
   const craterAppliedFinal = useRef(false);
-  // 突き刺さった隕石の周りに散らばる小さな岩の破片(衝突ごとにDEBRIS_PER_IMPACT個ずつ使う)。
-  const debrisRefs = useRef<(THREE.Mesh | null)[]>([]);
-  const debrisMatRefs = useRef<(THREE.MeshStandardMaterial | null)[]>([]);
   const discMatRef = useRef<THREE.MeshStandardMaterial>(null);
   const ring1Ref = useRef<THREE.Mesh>(null);
   const ring1MatRef = useRef<THREE.MeshStandardMaterial>(null);
@@ -686,14 +679,6 @@ function GachaRig({
     });
     decoyStuckRefs.current.forEach(bumpify);
 
-    debrisMatRefs.current.forEach((mat) => {
-      if (!mat) return;
-      mat.map = tex;
-      mat.emissiveMap = tex;
-      mat.needsUpdate = true;
-    });
-    debrisRefs.current.forEach(bumpify);
-
     return () => tex.dispose();
   }, []);
 
@@ -739,13 +724,6 @@ function GachaRig({
     craterAppliedDecoy.current = craterAppliedDecoy.current.map(() => false);
     craterAppliedFinal.current = false;
     if (groundMeshRef.current) applyCraters(groundMeshRef.current, []);
-    // 岩の破片も一旦すべて隠す(着弾のたびに該当スロットだけ再配置する)。
-    debrisMatRefs.current.forEach((mat) => {
-      if (mat) mat.opacity = 0;
-    });
-    debrisRefs.current.forEach((mesh) => {
-      if (mesh) mesh.visible = false;
-    });
 
     if (newNames.length > 0) {
       // ラベルバッジの配色を、今回の魔法陣の当選色と揃える。
@@ -910,36 +888,11 @@ function GachaRig({
         meteorMatRef.current.opacity = 0;
       }
     }
-    // 着弾地点の周りに、小さな岩の破片をランダムに散らす(呼び出しはuseFrame内=副作用の
-    // タイミングのみなので、ここでMath.randomを使ってよい)。rockRadiusは隕石本体の見た目の
-    // 半径で、破片がその表面に接する程度の近さに収まるよう距離レンジを決める。
-    const spawnDebris = (baseIndex: number, cx: number, cz: number, rockRadius: number, sizeMul: number) => {
-      for (let j = 0; j < DEBRIS_PER_IMPACT; j += 1) {
-        const mesh = debrisRefs.current[baseIndex + j];
-        const mat = debrisMatRefs.current[baseIndex + j];
-        if (!mesh || !mat) continue;
-        const angle = Math.random() * Math.PI * 2;
-        const dist = rockRadius * (0.75 + Math.random() * 0.3);
-        const scale = (0.5 + Math.random() * 0.35) * sizeMul;
-        // 破片の半分近くを地面にめり込ませ、突き出た岩の頭だけが見えるようにする。
-        mesh.position.set(cx + Math.cos(angle) * dist, -DEBRIS_RADIUS * scale * 0.9, cz + Math.sin(angle) * dist);
-        mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-        mesh.scale.setScalar(scale);
-        mesh.visible = true;
-        // 破片は隕石本体と同じ岩肌の色に揃える。
-        mat.color.set("#525252");
-        mat.emissive.set("#000000");
-        mat.emissiveIntensity = 0;
-        mat.opacity = 1;
-      }
-    };
-
-    // 本命が突き刺さった瞬間に1回だけ、大きめのクレーターと周りの岩の破片を作る。
+    // 本命が突き刺さった瞬間に1回だけ、大きめのクレーターを作る。
     if (finalStuck && !craterAppliedFinal.current) {
       craterAppliedFinal.current = true;
       craterImpacts.current = [...craterImpacts.current, { x: slotEnd.x, z: slotEnd.z, radius: 0.85, depth: 0.16 }];
       if (groundMeshRef.current) applyCraters(groundMeshRef.current, craterImpacts.current);
-      spawnDebris(DECOY_COUNT * DEBRIS_PER_IMPACT, slotEnd.x, slotEnd.z, 0.48, 1);
     }
     // おとり隕石: それぞれの落下+一時停止サイクルが終わった瞬間から、着弾地点に突き刺さったまま残す。
     for (let i = 0; i < DECOY_COUNT; i += 1) {
@@ -954,12 +907,11 @@ function GachaRig({
         // 本命の隕石と同じく、灰色の岩肌+ひび割れから魔法陣の光が漏れ出る発光にする。
         mat.color.set("#525252");
         mat.emissive.set(color);
-        // 着弾の瞬間に1回だけ、ひとまわり小さいクレーターと岩の破片を作る。
+        // 着弾の瞬間に1回だけ、ひとまわり小さいクレーターを作る。
         if (!craterAppliedDecoy.current[i]) {
           craterAppliedDecoy.current[i] = true;
           craterImpacts.current = [...craterImpacts.current, { x: end.x, z: end.z, radius: 0.55, depth: 0.09 }];
           if (groundMeshRef.current) applyCraters(groundMeshRef.current, craterImpacts.current);
-          spawnDebris(i * DEBRIS_PER_IMPACT, end.x, end.z, 0.24, 0.6);
         }
       } else {
         mesh.visible = false;
@@ -1317,30 +1269,6 @@ function GachaRig({
             emissive="#ff8a3d"
             emissiveIntensity={1.3}
             roughness={0.85}
-            metalness={0.05}
-            transparent
-            opacity={0}
-          />
-        </mesh>
-      ))}
-      {/* 突き刺さった隕石の周りに散らばる、小さな岩の破片。 */}
-      {Array.from({ length: DEBRIS_COUNT }, (_, i) => (
-        <mesh
-          key={i}
-          visible={false}
-          ref={(el) => {
-            debrisRefs.current[i] = el;
-          }}
-        >
-          <icosahedronGeometry args={[DEBRIS_RADIUS, 0]} />
-          <meshStandardMaterial
-            ref={(el) => {
-              debrisMatRefs.current[i] = el;
-            }}
-            color="#525252"
-            emissive="#000000"
-            emissiveIntensity={0}
-            roughness={0.9}
             metalness={0.05}
             transparent
             opacity={0}

@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Claude Code local state (personal, not shared project config)
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
