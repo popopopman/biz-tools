@@ -8,7 +8,7 @@ export default function SiteHeader() {
     <header className="glass-card sticky top-0 z-40 border-x-0 border-t-0">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
         <Link href="/" className="glow-text text-lg font-extrabold tracking-tight">
-          🧰 Biz Tools
+          🧰 便利ツール
         </Link>
         <nav className="flex flex-wrap gap-x-1 gap-y-2 text-sm">
           {tools.map((tool) => (

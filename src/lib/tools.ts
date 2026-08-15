@@ -1,4 +1,4 @@
-// 1つのツール(タイマー/ルーレット/くじ引き/サイコロ)に関するメタ情報。
+// 1つのツール(タイマー/ルーレット/ガチャ/サイコロ/パスワード生成/コイントス)に関するメタ情報。
 // トップページのカード一覧・ヘッダーのナビ・各ツールページの見出しなど、
 // 複数箇所から参照する共通データなのでここに一元化している。
 export type ToolMeta = {
@@ -25,13 +25,13 @@ export const tools: ToolMeta[] = [
     shortName: "ルーレット",
     emoji: "🎯",
     description: "項目を登録してくるくる回すだけ。担当決めやランチ選びに使える抽選ルーレット。",
-    accent: "#db2777",
+    accent: "#059669",
   },
   {
-    slug: "kuji",
-    name: "くじ引き",
-    shortName: "くじ引き",
-    emoji: "🎴",
+    slug: "gacha",
+    name: "ガチャ",
+    shortName: "ガチャ",
+    emoji: "🔮",
     description: "参加者リストから順番や当選者を重複なく抽選。席替えや発表順決めに。",
     accent: "#059669",
   },
@@ -42,6 +42,22 @@ export const tools: ToolMeta[] = [
     emoji: "🎲",
     description: "面数と個数を選んで振るだけのオンラインダイス。ゲームや簡易抽選に。",
     accent: "#d97706",
+  },
+  {
+    slug: "password",
+    name: "パスワード生成",
+    shortName: "パスワード",
+    emoji: "🔑",
+    description: "文字種と桁数を選んで安全なパスワードを生成。ワンクリックでコピー可能。",
+    accent: "#7c3aed",
+  },
+  {
+    slug: "coin",
+    name: "コイントス",
+    shortName: "コイントス",
+    emoji: "🪙",
+    description: "3Dコインを投げて表裏を決める。二択の決定やゲームの先攻/後攻決めに。",
+    accent: "#eab308",
   },
 ];
 

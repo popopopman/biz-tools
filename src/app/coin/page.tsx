@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
 import ToolPageShell from "@/components/ToolPageShell";
-import DiceTool from "@/components/tools/DiceTool";
+import CoinTool from "@/components/tools/CoinTool";
 import { getTool } from "@/lib/tools";
 
-const tool = getTool("dice")!;
+const tool = getTool("coin")!;
 
 export const metadata: Metadata = {
   title: tool.name,
   description: tool.description,
 };
 
-export default function DicePage() {
+export default function CoinPage() {
   return (
-    <ToolPageShell tool={tool} adSlotTop="4000000001" adSlotBottom="4000000002">
-      <DiceTool />
+    <ToolPageShell tool={tool} adSlotTop="6000000001" adSlotBottom="6000000002">
+      <CoinTool />
     </ToolPageShell>
   );
 }

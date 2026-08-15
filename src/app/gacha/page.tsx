@@ -1,20 +1,20 @@
 import type { Metadata } from "next";
 import ToolPageShell from "@/components/ToolPageShell";
-import KujiTool from "@/components/tools/KujiTool";
+import GachaTool from "@/components/tools/GachaTool";
 import { getTool } from "@/lib/tools";
 
-const tool = getTool("kuji")!;
+const tool = getTool("gacha")!;
 
-// サーバーコンポーネント(metadata出力用)。中身はクライアント側のKujiTool。
+// サーバーコンポーネント(metadata出力用)。中身はクライアント側のGachaTool。
 export const metadata: Metadata = {
   title: tool.name,
   description: tool.description,
 };
 
-export default function KujiPage() {
+export default function GachaPage() {
   return (
     <ToolPageShell tool={tool} adSlotTop="3000000001" adSlotBottom="3000000002">
-      <KujiTool />
+      <GachaTool />
     </ToolPageShell>
   );
 }

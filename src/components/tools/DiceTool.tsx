@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
-import type { DieSides } from "@/lib/dice3d";
+import { playDiceResult } from "@/lib/diceSound";
 
 // three.js(WebGL)を使う3Dシーンはサーバー側でレンダリングできないため、
 // ssr:falseの動的importでクライアントのみで読み込む。
@@ -15,14 +15,10 @@ const DiceScene = dynamic(() => import("@/components/three/DiceScene"), {
   ),
 });
 
-// 選択可能な面数(D4〜D20)。
-const SIDE_OPTIONS: DieSides[] = [4, 6, 8, 10, 12, 20];
-
 // サイコロツールの外枠(2D DOM側)のコンポーネント。
 // 実際の物理シミュレーション・出目判定は3D側(DiceScene)に任せ、
-// ここでは「面数・個数の選択」「振るボタン」「結果表示」だけを担当する。
+// ここでは「個数の選択」「振るボタン」「結果表示」だけを担当する。
 export default function DiceTool() {
-  const [sides, setSides] = useState<DieSides>(6);
   const [count, setCount] = useState(2);
   // trigger を更新するたびにDiceScene側で新しいロールが発生する
   // (値そのものには意味がなく、変化したことだけが合図になる)。
@@ -47,14 +43,15 @@ export default function DiceTool() {
     setResults(values);
     setRolling(false);
     if (safetyTimer.current) clearTimeout(safetyTimer.current);
+    playDiceResult();
   };
 
   const sum = results?.reduce((a, b) => a + b, 0) ?? null;
 
   return (
     <div className="flex flex-col items-center gap-6">
-      <div className="h-[360px] w-full max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[.04] to-transparent">
-        <DiceScene sides={sides} count={count} trigger={trigger} onAllSettled={handleAllSettled} />
+      <div className="h-[560px] w-full max-w-4xl overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[.04] to-transparent">
+        <DiceScene count={count} trigger={trigger} onAllSettled={handleAllSettled} />
       </div>
 
       <div className="flex min-h-16 flex-wrap items-center justify-center gap-2">
@@ -89,46 +86,24 @@ export default function DiceTool() {
         {rolling ? "振っています…" : "サイコロを振る"}
       </button>
 
-      <div className="grid w-full max-w-sm grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <p className="mb-2 text-sm font-medium text-white/60">面の数</p>
-          <div className="flex flex-wrap gap-2">
-            {SIDE_OPTIONS.map((s) => (
-              <button
-                key={s}
-                onClick={() => setSides(s)}
-                disabled={rolling}
-                className={`rounded-full border px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50 ${
-                  sides === s
-                    ? "border-amber-600 bg-amber-600 text-white"
-                    : "border-white/15 text-white/70 hover:bg-white/10"
-                }`}
-              >
-                D{s}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-2 text-sm font-medium text-white/60">個数</p>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setCount((c) => Math.max(1, c - 1))}
-              disabled={rolling}
-              className="h-8 w-8 rounded-full border border-white/15 text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              −
-            </button>
-            <span className="w-6 text-center font-medium text-white">{count}</span>
-            <button
-              onClick={() => setCount((c) => Math.min(6, c + 1))}
-              disabled={rolling}
-              className="h-8 w-8 rounded-full border border-white/15 text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              ＋
-            </button>
-          </div>
+      <div className="flex flex-col items-center gap-2">
+        <p className="text-sm font-medium text-white/60">個数</p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setCount((c) => Math.max(1, c - 1))}
+            disabled={rolling}
+            className="h-8 w-8 rounded-full border border-white/15 text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            −
+          </button>
+          <span className="w-6 text-center font-medium text-white">{count}</span>
+          <button
+            onClick={() => setCount((c) => Math.min(6, c + 1))}
+            disabled={rolling}
+            className="h-8 w-8 rounded-full border border-white/15 text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            ＋
+          </button>
         </div>
       </div>
     </div>

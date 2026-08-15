@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import AdSlot from "@/components/AdSlot";
 import type { ToolMeta } from "@/lib/tools";
 
-// 4つのツールページ(timer/roulette/kuji/dice)共通の外枠。
+// 各ツールページ(timer/roulette/gacha/dice/password/coin)共通の外枠。
 // タイトル・説明文・上下の広告枠を統一し、各ツール固有のUI(children)を
 // ガラス調のカード内に表示する。
 export default function ToolPageShell({

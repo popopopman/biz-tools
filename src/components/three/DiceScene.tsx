@@ -1,237 +1,325 @@
 "use client";
 
 import { Canvas, useFrame } from "@react-three/fiber";
+import { Physics, RigidBody, CuboidCollider, type RapierRigidBody } from "@react-three/rapier";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
-import { useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { getDieDefinition, quaternionForValue, pipTexture, type DieSides } from "@/lib/dice3d";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { valueFromQuaternion, alignedQuaternion, pipTexture, pipNormalTexture, FACE_VALUES } from "@/lib/dice3d";
+import { playDiceKnock } from "@/lib/diceSound";
+import { buildFeltColorTexture, buildFeltNormalTexture } from "@/lib/feltTexture";
 
-// サイコロ1個ずつに割り当てる色(D6以外の形状で使用)。
-const DIE_COLORS = ["#2563eb", "#db2777", "#059669", "#d97706", "#7c3aed", "#0891b2"];
+// ダイス本体のサイズと角の丸め具合。黒い立方体でおなじみの、角がわずかに
+// 丸まったダイスの見た目にする。
+const BOX_SIZE = 0.95;
+const CORNER_RADIUS = 0.14;
+
+// ダイス共通のgeometry(角丸ボックス)は1回だけ作って使い回す。
+const dieGeometry = new RoundedBoxGeometry(BOX_SIZE, BOX_SIZE, BOX_SIZE, 4, CORNER_RADIUS);
+
+// 各面の目(ピップ)テクスチャは1回だけ生成して使い回す
+// (RoundedBoxGeometryはBoxGeometryのマテリアルグループ順(+x,-x,+y,-y,+z,-z)を
+// そのまま引き継ぐので、FACE_VALUESと同じ順に並べればよい)。
+const baseFaceMaterials = FACE_VALUES.map(
+  (value) =>
+    new THREE.MeshStandardMaterial({
+      map: pipTexture(value),
+      // 法線マップで、ポチが実際に彫り込まれているような凹みを疑似表現する
+      // (ジオメトリ自体は平らなまま)。
+      normalMap: pipNormalTexture(value),
+      normalScale: new THREE.Vector2(1, 1),
+      roughness: 0.4,
+      metalness: 0.1,
+    })
+);
+
+const feltMap = buildFeltColorTexture("#670707");
+const feltNormalMap = buildFeltNormalTexture();
+
 // トレイ(サイコロを転がす台)の半径。原点から端までの距離。
-const TRAY_HALF = 3.2;
+const TRAY_HALF = 4.0;
 // サイコロが静止している時のY座標(トレイの床のすぐ上)。
 const REST_Y = 0.75;
+// トレイを囲む見えない壁の高さ(振っている間にサイコロが外へ転げ出ないようにする)。
+const WALL_HEIGHT = 6;
 
-// サイコロを転がす台(緑色の床)。物理演算は行わないため壁は不要。
+// 並進・回転の速度がこの閾値を下回った状態がSETTLE_HOLD秒続いたら「静止した」とみなす。
+const SETTLE_LIN_SPEED = 0.05;
+const SETTLE_ANG_SPEED = 0.1;
+const SETTLE_HOLD = 0.25;
+// 整列スライドアニメーションの秒数(DiceScene側の完了通知タイミングとも合わせる)。
+const ALIGN_DURATION = 0.5;
+
+// 実際のダイストレイ製品や「ヨット」系ダイスゲームによく見られる、フェルト敷きの
+// 中央を黒い縁(木枠)で囲うデザインを再現する見た目だけの縁。当たり判定は
+// WALL_HEIGHTの高い透明な壁が別途担っているので、こちらは見た目だけ調整すればよい。
+const BORDER_HEIGHT = 1.1;
+const BORDER_THICKNESS = 0.75;
+const BORDER_CORNER_RADIUS = 0.6;
+
+// (x, y)中心の角丸長方形パスをshapeに書き込む。
+function tracePath(path: THREE.Shape | THREE.Path, halfW: number, halfD: number, radius: number) {
+  const x0 = -halfW;
+  const y0 = -halfD;
+  path.moveTo(x0, y0 + radius);
+  path.lineTo(x0, y0 + halfD * 2 - radius);
+  path.quadraticCurveTo(x0, y0 + halfD * 2, x0 + radius, y0 + halfD * 2);
+  path.lineTo(x0 + halfW * 2 - radius, y0 + halfD * 2);
+  path.quadraticCurveTo(x0 + halfW * 2, y0 + halfD * 2, x0 + halfW * 2, y0 + halfD * 2 - radius);
+  path.lineTo(x0 + halfW * 2, y0 + radius);
+  path.quadraticCurveTo(x0 + halfW * 2, y0, x0 + halfW * 2 - radius, y0);
+  path.lineTo(x0 + radius, y0);
+  path.quadraticCurveTo(x0, y0, x0, y0 + radius);
+}
+
+// 外周の半径を基準に、内側に向かうほど角丸の半径を小さくしていく
+// (フェルトの開口部=一番内側は直角のまま)。額縁の各リングで丸みを揃えるための計算。
+const outerHalf = TRAY_HALF + BORDER_THICKNESS;
+function cornerRadiusAt(half: number): number {
+  return Math.max(0, BORDER_CORNER_RADIUS - (outerHalf - half));
+}
+
+// halfOuter〜halfInnerの正方形リング(枠)をShapeとして作り、指定した高さで
+// 押し出す。押し出し方向(Z)を後でYに回転させて縦に立てる
+// (フェルト床の上面=y=0を基準にそのまま置けば、そこから真っ直ぐ立ち上がる)。
+function buildRingGeometry(halfOuter: number, halfInner: number, height: number): THREE.BufferGeometry {
+  const shape = new THREE.Shape();
+  tracePath(shape, halfOuter, halfOuter, cornerRadiusAt(halfOuter));
+  const hole = new THREE.Path();
+  tracePath(hole, halfInner, halfInner, cornerRadiusAt(halfInner));
+  shape.holes.push(hole);
+
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false });
+  geometry.rotateX(-Math.PI / 2);
+  return geometry;
+}
+
+// 黒い縁を、外側から内側(フェルト側)へ向かって低くなっていく階段状にする。
+// リングをSTEP_COUNT本並べ、外側ほど幅・高さが大きい段にする(ピラミッドの
+// 一段を輪切りにしたような形)。
+const STEP_COUNT = 4;
+const stepWidth = BORDER_THICKNESS / STEP_COUNT;
+// 一番内側の段でもBORDER_HEIGHTのMIN_HEIGHT_RATIO倍は高さを保つことで、
+// 傾斜を緩やかにする(0にすると一番内側がほぼ埋まってしまうほど急になる)。
+const MIN_HEIGHT_RATIO = 0.6;
+const stepGeometries = Array.from({ length: STEP_COUNT }, (_, i) => {
+  const halfOuter = outerHalf - i * stepWidth;
+  const halfInner = outerHalf - (i + 1) * stepWidth;
+  const minHeight = BORDER_HEIGHT * MIN_HEIGHT_RATIO;
+  const height = minHeight + (BORDER_HEIGHT - minHeight) * ((STEP_COUNT - i) / STEP_COUNT);
+  return buildRingGeometry(halfOuter, halfInner, height);
+});
+
+// サイコロを転がす台(赤いフェルト敷きの床)+ 角丸の黒い縁 + 見えない4方向の壁(当たり判定)。
 function Tray() {
   return (
-    <mesh position={[0, -0.5, 0]} receiveShadow>
-      <boxGeometry args={[TRAY_HALF * 2, 1, TRAY_HALF * 2]} />
-      <meshStandardMaterial color="#0b4a2c" roughness={0.95} metalness={0} />
-    </mesh>
+    <RigidBody type="fixed" colliders={false}>
+      <CuboidCollider args={[TRAY_HALF, 0.5, TRAY_HALF]} position={[0, -0.5, 0]} friction={0.8} restitution={0.3} />
+      {/* 見た目の土台は枠の外周(outerHalf)までカバーする大きさにする。当たり判定の
+          床(CuboidCollider)は従来通りフェルトの遊び場部分(TRAY_HALF)だけでよい。 */}
+      <mesh position={[0, -0.5, 0]} receiveShadow>
+        <boxGeometry args={[outerHalf * 2, 1, outerHalf * 2]} />
+        <meshStandardMaterial map={feltMap} normalMap={feltNormalMap} roughness={0.95} metalness={0} />
+      </mesh>
+
+      {/* 穴(フェルト開口部)側の輪郭の巻き方向が外周と逆にならず、内側の壁面の法線が
+          反転してしまう(奥の壁の内側面などが見えなくなる)ため、両面描画にしておく。 */}
+      {stepGeometries.map((geo, i) => (
+        <mesh key={i} geometry={geo} castShadow receiveShadow>
+          <meshStandardMaterial color="#242424" roughness={0.35} metalness={0.35} side={THREE.DoubleSide} />
+        </mesh>
+      ))}
+
+      <CuboidCollider args={[0.2, WALL_HEIGHT / 2, TRAY_HALF]} position={[TRAY_HALF, WALL_HEIGHT / 2 - 0.5, 0]} restitution={0.3} />
+      <CuboidCollider args={[0.2, WALL_HEIGHT / 2, TRAY_HALF]} position={[-TRAY_HALF, WALL_HEIGHT / 2 - 0.5, 0]} restitution={0.3} />
+      <CuboidCollider args={[TRAY_HALF, WALL_HEIGHT / 2, 0.2]} position={[0, WALL_HEIGHT / 2 - 0.5, TRAY_HALF]} restitution={0.3} />
+      <CuboidCollider args={[TRAY_HALF, WALL_HEIGHT / 2, 0.2]} position={[0, WALL_HEIGHT / 2 - 0.5, -TRAY_HALF]} restitution={0.3} />
+    </RigidBody>
   );
 }
 
-// アニメーション1回分のパラメーター(useFrame内で読み書きするためrefで保持)。
-type RollAnim = {
-  rolling: boolean;
-  startTime: number;
-  duration: number;
-  spinAxis: THREE.Vector3;
-  totalSpins: number;
-  targetQuat: THREE.Quaternion;
-  value: number;
-  dropHeight: number;
-  startX: number;
-  startZ: number;
-};
-
-const GRAVITY = 30;
-const RESTITUTION = 0.45;
-
-// 高さdropHeightから自由落下→バウンドを繰り返して静止するまでの
-// 「床からの高さ」を時刻elapsedごとに計算する(本物の物理演算は使わず、
-// 落下・跳ね返りの運動方程式を1個の球として解析的に解くことで、
-// 見た目には自然な減衰バウンドを再現している)。
-function bounceHeight(elapsed: number, dropHeight: number): number {
-  let remaining = elapsed;
-  const firstFall = Math.sqrt((2 * dropHeight) / GRAVITY);
-  if (remaining <= firstFall) {
-    return dropHeight - 0.5 * GRAVITY * remaining * remaining;
-  }
-  remaining -= firstFall;
-  let v = GRAVITY * firstFall;
-
-  for (let bounce = 0; bounce < 8; bounce += 1) {
-    v *= RESTITUTION;
-    if (v < 0.3) return 0;
-    const airTime = (2 * v) / GRAVITY;
-    if (remaining <= airTime) {
-      return Math.max(0, v * remaining - 0.5 * GRAVITY * remaining * remaining);
-    }
-    remaining -= airTime;
-  }
-  return 0;
-}
-
-// 上と同じ運動をもとに、静止するまでに必要な合計時間を求める
-// (アニメーション全体の長さ・回転のイージングをこの値に合わせるため)。
-function totalSettleTime(dropHeight: number): number {
-  let total = Math.sqrt((2 * dropHeight) / GRAVITY);
-  let v = GRAVITY * total;
-  for (let bounce = 0; bounce < 8; bounce += 1) {
-    v *= RESTITUTION;
-    if (v < 0.3) break;
-    total += (2 * v) / GRAVITY;
-  }
-  return total;
-}
-
-// count個のサイコロの「静止位置」を、トレイの範囲内でお互い最低distanceだけ
-// 離れるように乱数で決める(単純な反復棄却法)。物理的な衝突判定はしていないが、
-// 着地後に重なって見えることを防げれば十分なため、この程度の簡易な方法で足りる。
-function generateSpreadPositions(count: number, bound: number, minDistance: number): [number, number][] {
-  const points: [number, number][] = [];
-  for (let i = 0; i < count; i += 1) {
-    let best: [number, number] = [0, 0];
-    let bestScore = -Infinity;
-    // 30回試して、他の点から最も離れている候補を採用する
-    // (完全に条件を満たす点が見つからなくても、マシな配置に収束させるため)。
-    for (let attempt = 0; attempt < 30; attempt += 1) {
-      const candidate: [number, number] = [(Math.random() * 2 - 1) * bound, (Math.random() * 2 - 1) * bound];
-      const minDistToOthers = points.reduce(
-        (min, p) => Math.min(min, Math.hypot(candidate[0] - p[0], candidate[1] - p[1])),
-        Infinity
-      );
-      if (minDistToOthers > bestScore) {
-        bestScore = minDistToOthers;
-        best = candidate;
-      }
-      if (minDistToOthers >= minDistance) break;
-    }
-    points.push(best);
-  }
-  return points;
-}
-
-// サイコロ1個分のコンポーネント。
-// @react-three/rapierによる本物の物理演算はWebGLのコンテキストロスト
-// (実機のGPUでも再現する不具合)を引き起こしたため使用していない。代わりに、
-// 「出目を先に乱数で決め→そこに向かって回転しながらバウンドするアニメーション」
-// で物理っぽい動きを再現する(いわゆるフェイク物理)。
+// サイコロ1個分のコンポーネント。@react-three/rapierによる本物の物理演算(重力・衝突)で転がす。
+// 出目は「先に決める」のではなく、静止後の姿勢(rotation)から実際に上を向いている面を読み取って求める。
+//
+// 以前この方式でWebGLのコンテキストロスト(実機のGPUでも再現する不具合)が起きたことがあるため、
+// その再発を避けるべく: Physicsワールド・RigidBodyは(countが変わらない限り)ロールの度に
+// 再マウントせず、既存のbodyの位置・速度をリセットするだけに留めている
+// (毎ロールごとにcollider/WASM側リソースを作り直すとリークしうるため)。
 function Die({
-  sides,
   index,
-  restPos,
-  color,
+  idlePos,
   trigger,
+  alignSignal,
   onSettle,
 }: {
-  sides: DieSides;
   index: number;
-  restPos: [number, number];
-  color: string;
+  idlePos: [number, number];
   trigger: number;
+  alignSignal: number;
   onSettle: (index: number, value: number) => void;
 }) {
-  const groupRef = useRef<THREE.Group>(null);
-  const def = useMemo(() => getDieDefinition(sides), [sides]);
+  const bodyRef = useRef<RapierRigidBody>(null);
+  const geometry = dieGeometry;
   const lastTrigger = useRef(0);
-  const anim = useRef<RollAnim | null>(null);
-
-  // マテリアル(見た目)を面数ごとに切り替える。
-  // D6だけは6面分のピップ(目)テクスチャを個別に貼り、それ以外は単色のフラットシェーディング。
-  const materials = useMemo(() => {
-    if (sides === 6) {
-      return def.faceValues.map(
-        (v) =>
-          new THREE.MeshStandardMaterial({
-            map: pipTexture(v),
-            roughness: 0.45,
-            metalness: 0.05,
-          })
-      );
-    }
-    return new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.25,
-      metalness: 0.2,
-      flatShading: true,
-    });
-  }, [sides, color, def]);
+  const lastAlignSignal = useRef(0);
+  const rolling = useRef(false);
+  const stillTime = useRef(0);
+  // 静止はしたが、まだ整列指示(alignSignal)を待っている間の情報を保持しておく。
+  const pendingAlign = useRef<{
+    fromX: number;
+    fromZ: number;
+    fromQuat: THREE.Quaternion;
+    toQuat: THREE.Quaternion;
+  } | null>(null);
+  // 整列位置(idlePos)へ位置・向きを滑らかにスライドさせるアニメーションの状態。
+  const align = useRef({
+    active: false,
+    startTime: 0,
+    fromX: 0,
+    fromZ: 0,
+    fromQuat: new THREE.Quaternion(),
+    toQuat: new THREE.Quaternion(),
+  });
 
   // triggerが変化した = 「振る」ボタンが押された合図。
-  // 出目を乱数で決め、そこに着地するアニメーションのパラメーターを設定する。
+  // トレイ上空のランダムな位置・姿勢に飛ばし、ランダムな速度・角速度を与えて物理演算に委ねる。
   useEffect(() => {
     if (trigger === lastTrigger.current) return;
     lastTrigger.current = trigger;
+    const body = bodyRef.current;
+    if (!body) return;
 
-    const value = def.faceValues[Math.floor(Math.random() * def.faceValues.length)];
-    const yaw = Math.random() * Math.PI * 2;
-    const spinAxis = new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.4 + 0.6, Math.random() - 0.5).normalize();
-    const dropHeight = 4 + Math.random() * 1.5;
+    const startX = idlePos[0] + (Math.random() - 0.5) * 1.2;
+    const startZ = idlePos[1] + (Math.random() - 0.5) * 1.2;
+    const rotation = new THREE.Quaternion().setFromEuler(
+      new THREE.Euler(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2)
+    );
 
-    anim.current = {
-      rolling: true,
-      startTime: performance.now() / 1000,
-      duration: totalSettleTime(dropHeight),
-      spinAxis,
-      totalSpins: 4 + Math.random() * 2.5,
-      targetQuat: quaternionForValue(def, value, yaw),
-      value,
-      dropHeight,
-      // トレイ中央付近のランダムな位置から落下させ、着地するまでの間に
-      // 割り当てられた静止位置(restPos、重ならないよう散らして計算済み)まで
-      // 転がり込んでいくように見せる。
-      startX: (Math.random() - 0.5) * 2,
-      startZ: (Math.random() - 0.5) * 2,
-    };
-  }, [trigger, def]);
+    body.setTranslation({ x: startX, y: 4 + Math.random() * 1.5, z: startZ }, true);
+    body.setRotation(rotation, true);
+    body.setLinvel({ x: (Math.random() - 0.5) * 2, y: -2, z: (Math.random() - 0.5) * 2 }, true);
+    body.setAngvel(
+      { x: (Math.random() - 0.5) * 20, y: (Math.random() - 0.5) * 20, z: (Math.random() - 0.5) * 20 },
+      true
+    );
+    rolling.current = true;
+    stillTime.current = 0;
+    align.current.active = false;
+    pendingAlign.current = null;
+  }, [trigger, idlePos]);
 
-  useFrame(() => {
-    const group = groupRef.current;
-    const a = anim.current;
-    if (!group) return;
+  // alignSignalが変化した = 「全てのサイコロが静止した」合図。ここで初めて
+  // 整列位置へのスライドを開始する(静止した瞬間に個別に動き出すと、まだ
+  // 転がっている他のサイコロがある間に動いてしまうため)。
+  useEffect(() => {
+    if (alignSignal === lastAlignSignal.current) return;
+    lastAlignSignal.current = alignSignal;
+    const pending = pendingAlign.current;
+    if (!pending) return;
+    align.current = { active: true, startTime: performance.now() / 1000, ...pending };
+  }, [alignSignal]);
 
-    if (!a || !a.rolling) {
-      group.position.set(restPos[0], REST_Y, restPos[1]);
+  useFrame((_, delta) => {
+    const body = bodyRef.current;
+    if (!body) return;
+
+    if (rolling.current) {
+      const lv = body.linvel();
+      const av = body.angvel();
+      const linSpeed = Math.hypot(lv.x, lv.y, lv.z);
+      const angSpeed = Math.hypot(av.x, av.y, av.z);
+
+      if (linSpeed < SETTLE_LIN_SPEED && angSpeed < SETTLE_ANG_SPEED) {
+        stillTime.current += delta;
+        if (stillTime.current >= SETTLE_HOLD) {
+          const r = body.rotation();
+          const quat = new THREE.Quaternion(r.x, r.y, r.z, r.w);
+          const value = valueFromQuaternion(quat);
+
+          // 物理演算の姿勢(角度)はそのまま採用する(意図的に補正しない)。
+          // ただし物理ソルバーの許容誤差でわずかに床にめり込む/浮くことがあるため、
+          // 現在の傾きのまま最下点がちょうど床面(y=0)に接するようYだけ補正する。
+          let minY = Infinity;
+          const v = new THREE.Vector3();
+          const pos = geometry.getAttribute("position");
+          for (let i = 0; i < pos.count; i += 1) {
+            v.fromBufferAttribute(pos, i).applyQuaternion(quat);
+            if (v.y < minY) minY = v.y;
+          }
+          const t = body.translation();
+          body.setTranslation({ x: t.x, y: -minY, z: t.z }, true);
+          body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+
+          rolling.current = false;
+          onSettle(index, value);
+          // 整列はまだ開始しない。全てのサイコロが静止し、alignSignalが来てから
+          // 一斉にスライドを始めるため、ここでは情報を保持するだけにする。
+          // (傾いたままの姿勢からalignedQuaternionへ滑らかにスライドする過程で
+          // 自然と真っ直ぐに揃う。)
+          pendingAlign.current = { fromX: t.x, fromZ: t.z, fromQuat: quat.clone(), toQuat: alignedQuaternion(value) };
+        }
+      } else {
+        stillTime.current = 0;
+      }
       return;
     }
 
-    const now = performance.now() / 1000;
-    const elapsed = now - a.startTime;
-    const t = Math.min(1, elapsed / a.duration);
-
-    // 落下〜バウンドの高さは運動方程式から解析的に求め、
-    // xz平面上は開始位置から着地位置(restPos)へ転がり込むようにease-outで収束させる。
-    const height = bounceHeight(elapsed, a.dropHeight);
-    const settle = 1 - Math.pow(1 - t, 3); // easeOutCubic
-    const x = a.startX + (restPos[0] - a.startX) * settle;
-    const z = a.startZ + (restPos[1] - a.startZ) * settle;
-    group.position.set(x, REST_Y + height, z);
-
-    // 落下中は指定軸でぐるぐる回転し、終盤(t>0.55〜1)で正しい出目の姿勢へ滑らかに収束する。
-    const spinQuat = new THREE.Quaternion().setFromAxisAngle(a.spinAxis, t * a.totalSpins * Math.PI * 2);
-    const blend = Math.min(1, Math.max(0, (t - 0.55) / 0.45));
-    const eased = blend * blend * (3 - 2 * blend); // smoothstep
-    spinQuat.slerp(a.targetQuat, eased);
-    group.quaternion.copy(spinQuat);
-
-    if (t >= 1) {
-      a.rolling = false;
-      group.position.set(restPos[0], REST_Y, restPos[1]);
-      group.quaternion.copy(a.targetQuat);
-      onSettle(index, a.value);
+    // 全サイコロが静止した後、床に触れたまま整列位置まで滑らかにスライドしつつ、
+    // 数字の向き(ヨー)も出目ごとに固定された向きへ揃える。
+    const a = align.current;
+    if (a.active) {
+      const progress = Math.min(1, (performance.now() / 1000 - a.startTime) / ALIGN_DURATION);
+      const eased = 1 - (1 - progress) ** 3;
+      const cur = body.translation();
+      body.setTranslation(
+        { x: a.fromX + (idlePos[0] - a.fromX) * eased, y: cur.y, z: a.fromZ + (idlePos[1] - a.fromZ) * eased },
+        true
+      );
+      const rotated = new THREE.Quaternion().slerpQuaternions(a.fromQuat, a.toQuat, eased);
+      body.setRotation(rotated, true);
+      // 静止済みのbodyでも重力で速度が蓄積し続けるため、スライド中は毎フレーム
+      // ゼロに戻しておく(そうしないとスライド完了後に急に落下・跳ねてしまう)。
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      if (progress >= 1) a.active = false;
     }
   });
 
+  // 床・壁・他のサイコロにぶつかった瞬間に呼ばれる。ぶつかった時点の速さを
+  // 音の大きさ・高さに反映することで、勢いよくぶつかったかどうかが伝わるようにする。
+  const handleCollision = () => {
+    const body = bodyRef.current;
+    if (!body) return;
+    const lv = body.linvel();
+    playDiceKnock(Math.hypot(lv.x, lv.y, lv.z));
+  };
+
   return (
-    <group ref={groupRef} position={[restPos[0], REST_Y, restPos[1]]}>
-      <mesh geometry={def.geometry} material={materials} castShadow receiveShadow />
-    </group>
+    <RigidBody
+      ref={bodyRef}
+      position={[idlePos[0], REST_Y, idlePos[1]]}
+      colliders="hull"
+      density={2.3}
+      restitution={0.48}
+      friction={0.6}
+      linearDamping={0.25}
+      angularDamping={0.3}
+      onCollisionEnter={handleCollision}
+    >
+      <mesh geometry={geometry} material={baseFaceMaterials} castShadow receiveShadow />
+    </RigidBody>
   );
 }
 
 // サイコロツールの3Dシーン本体。
-// 指定した面数・個数のサイコロをトレイ上に配置し、アニメーションで転がして出目を確定する。
+// 指定した個数のサイコロをトレイ上に配置し、物理演算で転がして出目を確定する。
 export default function DiceScene({
-  sides,
   count,
   trigger,
   onAllSettled,
 }: {
-  sides: DieSides;
   count: number;
   trigger: number;
   onAllSettled: (values: number[]) => void;
@@ -240,19 +328,19 @@ export default function DiceScene({
   // 走ってしまうため、refで保持し、全て揃った時だけonAllSettledを呼ぶ。
   const resultsRef = useRef<(number | null)[]>([]);
   const reportedTrigger = useRef(-1);
+  // 値が変わるたびに「全サイコロが静止したので整列を始めてよい」という合図として
+  // 各Dieに配る(全員が同時にスライドを始められるよう、1箇所に揃うのを待つ)。
+  const [alignSignal, setAlignSignal] = useState(0);
 
   useEffect(() => {
     resultsRef.current = Array(count).fill(null);
   }, [count, trigger]);
 
-  // ロールごとに、サイコロ同士が重ならない着地位置を再計算する。
-  // trigger===0(まだ一度も振っていない)間は綺麗な横一列に並べておく。
-  const restPositions = useMemo<[number, number][]>(() => {
-    if (trigger === 0) {
-      return Array.from({ length: count }, (_, i) => [(i - (count - 1) / 2) * 1.2, 0]);
-    }
-    return generateSpreadPositions(count, TRAY_HALF - 1.1, 1.5);
-  }, [count, trigger]);
+  // まだ一度も振っていない間の初期配置(横一列)。ロール中・後の位置は物理演算に任せる。
+  const idlePositions = useMemo<[number, number][]>(
+    () => Array.from({ length: count }, (_, i) => [(i - (count - 1) / 2) * 1.2, 0]),
+    [count]
+  );
 
   const handleSettle = (index: number, value: number) => {
     if (resultsRef.current.length !== count) return;
@@ -260,38 +348,48 @@ export default function DiceScene({
     // 同じtriggerに対して二重に報告しないようreportedTriggerで防止する。
     if (reportedTrigger.current !== trigger && resultsRef.current.every((v) => v !== null)) {
       reportedTrigger.current = trigger;
-      onAllSettled(resultsRef.current as number[]);
+      const values = resultsRef.current as number[];
+      // 全員に整列を開始させ、そのスライドが終わるタイミング(ALIGN_DURATION後)で
+      // 結果確定を通知する(効果音が整列完了とぴったり重なるようにするため)。
+      setAlignSignal((s) => s + 1);
+      setTimeout(() => onAllSettled(values), ALIGN_DURATION * 1000);
     }
   };
 
   return (
-    <Canvas shadows camera={{ position: [0, 6.5, 6.5], fov: 42 }} gl={{ alpha: true, antialias: true }} dpr={[1, 2]}>
+    <Canvas shadows camera={{ position: [0, 7.6, 7.6], fov: 42 }} gl={{ alpha: true, antialias: true }} dpr={[1, 2]}>
       <ambientLight intensity={0.7} />
       <directionalLight
         position={[4, 8, 3]}
         intensity={1.4}
         castShadow
         shadow-mapSize={[1024, 1024]}
-        shadow-camera-left={-6}
-        shadow-camera-right={6}
-        shadow-camera-top={6}
-        shadow-camera-bottom={-6}
+        shadow-camera-left={-8.5}
+        shadow-camera-right={8.5}
+        shadow-camera-top={8.5}
+        shadow-camera-bottom={-8.5}
       />
       {/* リッチな見た目にするための補助的な色付きライト(青紫・ピンク)。 */}
       <pointLight position={[-4, 3, -3]} intensity={0.5} color="#818cf8" />
       <pointLight position={[4, 2, 4]} intensity={0.35} color="#f472b6" />
-      <Tray />
-      {Array.from({ length: count }).map((_, i) => (
-        <Die
-          key={i}
-          sides={sides}
-          index={i}
-          restPos={restPositions[i]}
-          color={DIE_COLORS[i % DIE_COLORS.length]}
-          trigger={trigger}
-          onSettle={handleSettle}
-        />
-      ))}
+      {/* @react-three/rapierはWASMエンジンを非同期に初期化するためSuspenseで待機する。
+          next/dynamicのloadingはモジュール自体の遅延importにのみ効き、
+          Canvas配下(R3F独自のreactツリー)の内側では別途Suspenseが必要。 */}
+      <Suspense fallback={null}>
+        <Physics gravity={[0, -25, 0]}>
+          <Tray />
+          {Array.from({ length: count }).map((_, i) => (
+            <Die
+              key={i}
+              index={i}
+              idlePos={idlePositions[i]}
+              trigger={trigger}
+              alignSignal={alignSignal}
+              onSettle={handleSettle}
+            />
+          ))}
+        </Physics>
+      </Suspense>
       {/* Bloom: 明るい部分がにじんで光るような演出。Vignette: 画面端を少し暗くして中央に視線を集める。 */}
       <EffectComposer multisampling={0}>
         <Bloom luminanceThreshold={0.35} luminanceSmoothing={0.9} intensity={0.55} mipmapBlur />

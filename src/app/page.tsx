@@ -16,7 +16,7 @@ export default function Home() {
           業務でそのまま使える無料ツール集
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-sm text-white/55 sm:text-base">
-          会議・研修・イベントで役立つタイマー、ルーレット、くじ引き、サイコロ。
+          会議・研修・イベントで役立つタイマー、ルーレット、ガチャ、サイコロ。
           会員登録不要・インストール不要、ブラウザだけで完結します。
         </p>
       </section>

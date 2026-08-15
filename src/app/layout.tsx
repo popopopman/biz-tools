@@ -16,14 +16,14 @@ const geistMono = Geist_Mono({
 });
 
 // サイト全体のデフォルトmetadata。各ツールページ側でtitleを上書きすると
-// 「ツール名 | Biz Tools」の形式(template)で表示される。
+// 「ツール名 | 便利ツール」の形式(template)で表示される。
 export const metadata: Metadata = {
   title: {
-    default: "Biz Tools | 業務で使える無料オンラインツール集",
-    template: "%s | Biz Tools",
+    default: "便利ツール | 業務で使える無料オンラインツール集",
+    template: "%s | 便利ツール",
   },
   description:
-    "タイマー・ルーレット・くじ引き・サイコロなど、会議や職場ですぐ使える無料のオンラインツール集です。インストール不要、ブラウザだけで動作します。",
+    "タイマー・ルーレット・ガチャ・サイコロなど、会議や職場ですぐ使える無料のオンラインツール集です。インストール不要、ブラウザだけで動作します。",
 };
 
 // AdSenseの読み込みスクリプトはIDが設定されている時だけ差し込む
@@ -37,6 +37,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="ja"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      // Dark Readerなどの拡張機能がReact読み込み前に<html>へ属性を注入することがあり、
+      // それによるハイドレーション不一致の警告(実害はない)を抑制する。
+      suppressHydrationWarning
     >
       <head>
         {ADSENSE_CLIENT ? (
