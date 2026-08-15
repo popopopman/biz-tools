@@ -1,6 +1,6 @@
 # 便利ツール
 
-🔗 公開ページ: https://popopopman.github.io/biz-tools/
+🔗 公開ページ: [https://popopopman.github.io/biz-tools/](https://popopopman.github.io/biz-tools/)
 
 タイマー・ルーレット・ガチャ・サイコロなど、会議や職場ですぐ使える無料のオンラインツール集です。
 会員登録・インストール不要で、全ての機能がブラウザ内だけで完結します(入力データはサーバーに送信されません)。
