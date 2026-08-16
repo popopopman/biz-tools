@@ -24,6 +24,8 @@ export default function DiceTool() {
   const [trigger, setTrigger] = useState(0);
   const [rolling, setRolling] = useState(false);
   const [results, setResults] = useState<number[] | null>(null);
+  // 直近の出目履歴(新しい順、1件=1回分の出目の配列)。
+  const [history, setHistory] = useState<number[][]>([]);
   // 物理演算が万一収束しなかった場合に備えたフォールバック用タイマー。
   const safetyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -41,6 +43,7 @@ export default function DiceTool() {
   const handleAllSettled = (values: number[]) => {
     setResults(values);
     setRolling(false);
+    setHistory((h) => [values, ...h].slice(0, 12));
     if (safetyTimer.current) clearTimeout(safetyTimer.current);
     playDiceResult();
   };
@@ -48,68 +51,82 @@ export default function DiceTool() {
   const sum = results?.reduce((a, b) => a + b, 0) ?? null;
 
   return (
-    // 横幅に余裕がある画面ではスクロールせずに操作できるよう、
-    // 左にシーン、右に操作(結果・振るボタン・個数)を並べる。
-    <div className="grid w-full gap-6 md:grid-cols-[3fr_2fr] md:items-start">
-      <div className="h-[380px] w-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[.04] to-transparent sm:h-[560px]">
+    <div className="flex w-full flex-col items-center gap-6">
+      <div className="h-[280px] w-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[.04] to-transparent sm:h-[420px]">
         <DiceScene count={count} trigger={trigger} onAllSettled={handleAllSettled} />
       </div>
 
-      <div className="flex flex-col items-center gap-6">
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-sm font-medium text-white/60">{t.dice.countLabel}</p>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setCount((c) => Math.max(1, c - 1))}
-              disabled={rolling}
-              className="h-8 w-8 rounded-full border border-white/15 text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              −
-            </button>
-            <span className="w-6 text-center font-medium text-white">{count}</span>
-            <button
-              onClick={() => setCount((c) => Math.min(6, c + 1))}
-              disabled={rolling}
-              className="h-8 w-8 rounded-full border border-white/15 text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              ＋
-            </button>
-          </div>
-        </div>
+      <button
+        onClick={roll}
+        disabled={rolling}
+        className="glow-btn w-full max-w-xs rounded-lg bg-amber-600 px-8 py-2.5 font-medium text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {rolling ? t.dice.rolling : t.dice.roll}
+      </button>
 
-        <button
-          onClick={roll}
-          disabled={rolling}
-          className="glow-btn w-full max-w-xs rounded-lg bg-amber-600 px-8 py-2.5 font-medium text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {rolling ? t.dice.rolling : t.dice.roll}
-        </button>
-
-        {/* 結果表示系のUI(出目)は一番下にまとめる。 */}
-        <div className="flex min-h-16 flex-wrap items-center justify-center gap-2">
-          {results ? (
-            <>
-              {results.map((v, i) => (
-                <span
-                  key={i}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-600 font-bold text-white shadow-sm"
-                >
-                  {v}
-                </span>
-              ))}
-              {results.length > 1 && (
-                <span className="ml-2 text-sm text-white/60">
-                  {t.dice.total} <span className="font-semibold">{sum}</span>
-                </span>
-              )}
-            </>
-          ) : (
-            <span className="text-sm text-white/40">
-              {rolling ? t.dice.rolling : t.dice.prompt}
-            </span>
-          )}
+      <div className="flex flex-col items-center gap-2">
+        <p className="text-sm font-medium text-white/60">{t.dice.countLabel}</p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setCount((c) => Math.max(1, c - 1))}
+            disabled={rolling}
+            className="h-8 w-8 rounded-full border border-white/15 text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            −
+          </button>
+          <span className="w-6 text-center font-medium text-white">{count}</span>
+          <button
+            onClick={() => setCount((c) => Math.min(6, c + 1))}
+            disabled={rolling}
+            className="h-8 w-8 rounded-full border border-white/15 text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            ＋
+          </button>
         </div>
       </div>
+
+      <div className="flex min-h-16 flex-wrap items-center justify-center gap-2">
+        {results ? (
+          <>
+            {results.map((v, i) => (
+              <span
+                key={i}
+                className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-600 font-bold text-white shadow-sm"
+              >
+                {v}
+              </span>
+            ))}
+            {results.length > 1 && (
+              <span className="ml-2 text-sm text-white/60">
+                {t.dice.total} <span className="font-semibold">{sum}</span>
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="text-sm text-white/40">
+            {rolling ? t.dice.rolling : t.dice.prompt}
+          </span>
+        )}
+      </div>
+
+      {history.length > 0 && (
+        <div className="w-full max-w-sm">
+          <p className="mb-1.5 text-xs font-medium text-white/50">{t.dice.history(history.length)}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {history.map((values, i) => (
+              <span
+                key={i}
+                className={`rounded-full px-2.5 py-1 text-xs ${
+                  i === 0 ? "bg-amber-600 text-white" : "bg-white/10 text-white/70"
+                }`}
+              >
+                {values.join("+")}
+                {values.length > 1 && ` = ${values.reduce((a, b) => a + b, 0)}`}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

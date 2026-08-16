@@ -9,6 +9,9 @@ const ja = {
     loadingScene: "3Dシーンを読み込み中…",
     adTop: (name: string) => `${name}上部広告`,
     adBottom: (name: string) => `${name}下部広告`,
+    adSide: "サイド広告",
+    fullscreenEnter: "全画面表示",
+    fullscreenExit: "全画面終了",
   },
   header: {
     siteName: "🧰 便利ツール",
@@ -102,6 +105,7 @@ const ja = {
     roll: "サイコロを振る",
     total: "合計:",
     countLabel: "個数",
+    history: (n: number) => `履歴(直近${n}回、新しい順)`,
   },
   coin: {
     front: "表",
@@ -138,6 +142,9 @@ const en: typeof ja = {
     loadingScene: "Loading 3D scene…",
     adTop: (name) => `${name} top ad`,
     adBottom: (name) => `${name} bottom ad`,
+    adSide: "Side ad",
+    fullscreenEnter: "Fullscreen",
+    fullscreenExit: "Exit fullscreen",
   },
   header: {
     siteName: "🧰 Handy Tools",
@@ -232,6 +239,7 @@ const en: typeof ja = {
     roll: "Roll dice",
     total: "Total:",
     countLabel: "Count",
+    history: (n) => `History (last ${n}, newest first)`,
   },
   coin: {
     front: "Heads",

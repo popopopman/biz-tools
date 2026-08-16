@@ -47,71 +47,67 @@ export default function CoinTool() {
   const backCount = history.length - frontCount;
 
   return (
-    // 横幅に余裕がある画面ではスクロールせずに操作できるよう、
-    // 左にシーン、右に操作(トスボタン・結果・履歴)を並べる。
-    <div className="grid w-full gap-6 md:grid-cols-[3fr_2fr] md:items-start">
-      <div className="h-[380px] w-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[.04] to-transparent sm:h-[560px]">
+    <div className="flex w-full flex-col items-center gap-6">
+      <div className="h-[280px] w-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[.04] to-transparent sm:h-[420px]">
         <SceneErrorBoundary>
           <CoinScene trigger={flipToken} onResult={handleResult} />
         </SceneErrorBoundary>
       </div>
 
-      <div className="flex flex-col items-center gap-6">
-        {/* コイン本体の表(金色)・裏(銀色)と同じグラデーションを凡例の丸に使い、
-            実際の見た目の色そのままで表裏を判断できるようにしている。 */}
-        <div className="flex items-center gap-4 text-xs text-white/50">
-          <span className="flex items-center gap-1.5">
-            <span
-              className="inline-block h-3.5 w-3.5 rounded-full"
-              style={{ background: "linear-gradient(135deg, #fff6cf, #c99a2e)" }}
-            />
-            {t.coin.front}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span
-              className="inline-block h-3.5 w-3.5 rounded-full"
-              style={{ background: "linear-gradient(135deg, #f5f5f5, #9a9a9a)" }}
-            />
-            {t.coin.back}
-          </span>
-        </div>
+      <button
+        onClick={flip}
+        disabled={flipping}
+        className="glow-btn w-full max-w-xs rounded-lg bg-yellow-600 px-8 py-2.5 font-medium text-white hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {flipping ? t.coin.flipping : t.coin.flip}
+      </button>
 
-        <button
-          onClick={flip}
-          disabled={flipping}
-          className="glow-btn rounded-lg bg-yellow-600 px-8 py-2.5 font-medium text-white hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {flipping ? t.coin.flipping : t.coin.flip}
-        </button>
+      {/* コイン本体の表(金色)・裏(銀色)と同じグラデーションを凡例の丸に使い、
+          実際の見た目の色そのままで表裏を判断できるようにしている。 */}
+      <div className="flex items-center gap-4 text-xs text-white/50">
+        <span className="flex items-center gap-1.5">
+          <span
+            className="inline-block h-3.5 w-3.5 rounded-full"
+            style={{ background: "linear-gradient(135deg, #fff6cf, #c99a2e)" }}
+          />
+          {t.coin.front}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span
+            className="inline-block h-3.5 w-3.5 rounded-full"
+            style={{ background: "linear-gradient(135deg, #f5f5f5, #9a9a9a)" }}
+          />
+          {t.coin.back}
+        </span>
+      </div>
 
-        <div className="h-8 text-lg font-semibold text-white">
-          {result && <span>{t.coin.result(SIDE_LABEL[result])}</span>}
-        </div>
+      <div className="h-8 text-lg font-semibold text-white">
+        {result && <span>{t.coin.result(SIDE_LABEL[result])}</span>}
+      </div>
 
-        {history.length > 0 && (
-          <div className="w-full max-w-sm space-y-3">
-            <div>
-              <p className="mb-1.5 text-xs font-medium text-white/50">{t.coin.history(history.length)}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {history.map((side, i) => (
-                  <span
-                    key={i}
-                    className={`rounded-full px-2.5 py-1 text-xs ${
-                      i === 0 ? "bg-yellow-600 text-white" : "bg-white/10 text-white/70"
-                    }`}
-                  >
-                    {SIDE_LABEL[side]}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div className="flex justify-center gap-4 text-xs text-white/60">
-              <span>{t.coin.front} ×{frontCount}</span>
-              <span>{t.coin.back} ×{backCount}</span>
+      {history.length > 0 && (
+        <div className="w-full max-w-sm space-y-3">
+          <div>
+            <p className="mb-1.5 text-xs font-medium text-white/50">{t.coin.history(history.length)}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {history.map((side, i) => (
+                <span
+                  key={i}
+                  className={`rounded-full px-2.5 py-1 text-xs ${
+                    i === 0 ? "bg-yellow-600 text-white" : "bg-white/10 text-white/70"
+                  }`}
+                >
+                  {SIDE_LABEL[side]}
+                </span>
+              ))}
             </div>
           </div>
-        )}
-      </div>
+          <div className="flex justify-center gap-4 text-xs text-white/60">
+            <span>{t.coin.front} ×{frontCount}</span>
+            <span>{t.coin.back} ×{backCount}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

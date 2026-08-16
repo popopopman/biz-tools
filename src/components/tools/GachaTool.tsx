@@ -99,9 +99,26 @@ export default function GachaTool() {
     // 横幅に余裕がある画面ではスクロールせずに操作できるよう、
     // 左に演出、右に操作(引くボタン・参加者リスト・結果)を並べる。
     <div className="grid w-full gap-6 md:grid-cols-[3fr_2fr] md:items-start">
-      <div className="flex w-full flex-col items-center gap-4">
+      <div className="flex min-w-0 w-full flex-col items-center gap-4">
         <div className="h-[360px] w-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[.04] to-transparent sm:h-[480px]">
           <GachaScene capacity={capacity} drawnCount={drawn.length} drawn={drawn} />
+        </div>
+
+        <div className="flex w-full max-w-xs gap-2">
+          <button
+            onClick={drawOne}
+            disabled={!started || (pool?.length ?? 0) === 0 || revealing}
+            className="glow-btn flex-1 rounded-lg bg-cyan-600 px-4 py-2.5 font-medium text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t.gacha.drawOne}
+          </button>
+          <button
+            onClick={drawAll}
+            disabled={!started || (pool?.length ?? 0) === 0 || revealing}
+            className="flex-1 rounded-lg border border-white/15 px-4 py-2.5 font-medium text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t.gacha.drawAll}
+          </button>
         </div>
 
         <p className="text-sm text-white/60">
@@ -115,7 +132,7 @@ export default function GachaTool() {
         </p>
       </div>
 
-      <div className="flex w-full flex-col items-center">
+      <div className="flex min-w-0 w-full flex-col items-center md:self-center">
         <div className="w-full max-w-sm">
           <label className="mb-2 block text-sm font-medium text-white/60">
             {t.gacha.itemsLabel}
@@ -144,23 +161,6 @@ export default function GachaTool() {
               {t.gacha.editList}
             </button>
           )}
-
-          <div className="mt-4 flex w-full gap-2">
-            <button
-              onClick={drawOne}
-              disabled={!started || (pool?.length ?? 0) === 0 || revealing}
-              className="glow-btn flex-1 rounded-lg bg-cyan-600 px-4 py-2.5 font-medium text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {t.gacha.drawOne}
-            </button>
-            <button
-              onClick={drawAll}
-              disabled={!started || (pool?.length ?? 0) === 0 || revealing}
-              className="flex-1 rounded-lg border border-white/15 px-4 py-2.5 font-medium text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {t.gacha.drawAll}
-            </button>
-          </div>
 
           {/* 結果表示系のUI(引いた結果一覧)は一番下にまとめる。 */}
           {revealedCount > 0 && (

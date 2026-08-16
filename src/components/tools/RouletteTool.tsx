@@ -62,15 +62,27 @@ export default function RouletteTool() {
     // 横幅に余裕がある画面ではスクロールせずに操作できるよう、
     // 左にホイール、右に操作(スピンボタン・結果・項目編集)を並べる。
     <div className="grid w-full gap-6 md:grid-cols-[3fr_2fr] md:items-start">
-      <div className="relative h-[380px] w-full overflow-hidden rounded-2xl border border-emerald-400/20 bg-gradient-to-b from-emerald-500/[.06] to-transparent sm:h-[560px]">
-        <RouletteScene items={items} spinToken={spinToken} onResult={handleResult} />
-        {/* 着地の瞬間に画面全体を一瞬光らせるフラッシュ。resultTokenが変わるたびに再生される。 */}
-        {winner && (
-          <div key={resultToken} className="animate-result-flash pointer-events-none absolute inset-0 bg-white" />
-        )}
+      <div className="flex min-w-0 flex-col items-center gap-4">
+        <div className="relative h-[320px] w-full overflow-hidden rounded-2xl border border-emerald-400/20 bg-gradient-to-b from-emerald-500/[.06] to-transparent sm:h-[480px]">
+          <RouletteScene items={items} spinToken={spinToken} onResult={handleResult} />
+          {/* 着地の瞬間に画面全体を一瞬光らせるフラッシュ。resultTokenが変わるたびに再生される。 */}
+          {winner && (
+            <div key={resultToken} className="animate-result-flash pointer-events-none absolute inset-0 bg-white" />
+          )}
+        </div>
+
+        <button
+          onClick={spin}
+          disabled={spinning || items.length < 2}
+          className={`glow-btn w-full max-w-sm rounded-lg bg-emerald-600 px-8 py-2.5 font-medium text-white transition-transform duration-150 hover:bg-emerald-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
+            spinning ? "animate-pulse" : ""
+          }`}
+        >
+          {spinning ? t.roulette.spinning : t.roulette.spin}
+        </button>
       </div>
 
-      <div className="flex flex-col items-center gap-6">
+      <div className="flex min-w-0 flex-col items-center gap-6 md:self-center">
         <div className="w-full max-w-sm">
           <label className="mb-2 block text-sm font-medium text-white/60">
             {t.roulette.itemsLabel}
@@ -83,16 +95,6 @@ export default function RouletteTool() {
           />
           <p className="mt-1 text-xs text-white/40">{t.roulette.itemsCount(items.length)}</p>
         </div>
-
-        <button
-          onClick={spin}
-          disabled={spinning || items.length < 2}
-          className={`glow-btn w-full max-w-sm rounded-lg bg-emerald-600 px-8 py-2.5 font-medium text-white transition-transform duration-150 hover:bg-emerald-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
-            spinning ? "animate-pulse" : ""
-          }`}
-        >
-          {spinning ? t.roulette.spinning : t.roulette.spin}
-        </button>
 
         {/* 結果表示系のUI(直近の結果・履歴・集計)は一番下にまとめる。 */}
         <div className="h-8 text-lg font-semibold text-white">

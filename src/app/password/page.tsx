@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function PasswordPage() {
   return (
-    <ToolPageShell tool={tool} adSlotTop="5000000001" adSlotBottom="5000000002">
+    <ToolPageShell tool={tool} adSlotTop="5000000001" adSlotBottom="5000000002" fullscreenEnabled={false}>
       <PasswordTool />
     </ToolPageShell>
   );
