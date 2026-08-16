@@ -1,6 +1,6 @@
 # 便利ツール
 
-🔗 公開ページ: [https://popopopman.github.io/biz-tools/](https://popopopman.github.io/biz-tools/)
+🔗 公開ページ: [https://popopopman.github.io/util-tools/](https://popopopman.github.io/util-tools/)
 
 タイマー・ルーレット・ガチャ・サイコロなど、会議や職場ですぐ使える無料のオンラインツール集です。
 会員登録・インストール不要で、全ての機能がブラウザ内だけで完結します(入力データはサーバーに送信されません)。
@@ -85,7 +85,7 @@ pnpm build    # 静的書き出し (out/ に生成)
 
 `.github/workflows/deploy.yml` で、`main`ブランチへのpush時に自動ビルド・デプロイされます。
 GitHub Pagesは静的ファイルしか配信できないため、`next.config.ts`で`output: "export"`を指定し、
-ビルド時に環境変数`GITHUB_PAGES=true`を渡すことでリポジトリ名(`/biz-tools`)を`basePath`に付与しています
+ビルド時に環境変数`GITHUB_PAGES=true`を渡すことでリポジトリ名(`/util-tools`)を`basePath`に付与しています
 (ローカルでの`pnpm build`ではこの環境変数を設定しないため、`/`直下で動く成果物になります)。
 
 リポジトリの Settings → Pages → Source を **GitHub Actions** に設定してください。

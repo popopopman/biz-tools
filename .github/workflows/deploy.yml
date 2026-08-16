@@ -44,7 +44,7 @@ jobs:
       - name: Build (static export)
         run: pnpm build
         env:
-          # next.config.ts がこのフラグを見て basePath(/biz-tools) を付与する。
+          # next.config.ts がこのフラグを見て basePath(/util-tools) を付与する。
           GITHUB_PAGES: "true"
           NEXT_PUBLIC_ADSENSE_CLIENT: ${{ secrets.ADSENSE_CLIENT }}
 

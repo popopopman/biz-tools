@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 // GitHub Pagesのリポジトリ名。プロジェクトページ(user.github.io/リポジトリ名/)として
 // 公開する場合、全てのアセットURLの先頭にこのパスを付与する必要がある。
-const repoName = "biz-tools";
+const repoName = "util-tools";
 // GITHUB_PAGES=true が設定されている時だけ basePath を付与する。
 // NODE_ENV==="production" 判定にしてしまうと、`pnpm build` をローカルや
 // Dockerのpreviewサービスで実行した時にも basePath が付いてしまい、
