@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { generatePassword, type PasswordOptions } from "@/lib/password";
 import { useT } from "@/lib/i18n";
+import ToolGrid from "@/components/ToolGrid";
 
 const TOGGLE_KEYS: (keyof Omit<PasswordOptions, "length" | "include">)[] = [
   "uppercase",
@@ -54,9 +55,7 @@ export default function PasswordTool() {
   } as const;
 
   return (
-    // 横幅に余裕がある画面ではスクロールせずに操作できるよう、
-    // 左に生成結果、右に設定(桁数・含める文字・文字種)を並べる。
-    <div className="grid w-full gap-8 md:grid-cols-2 md:items-center">
+    <ToolGrid>
       <div className="flex flex-col items-center gap-6">
         <div className="flex w-full items-center justify-between gap-3 rounded-xl border-2 border-violet-500/70 bg-white/5 px-4 py-4 shadow-[0_0_40px_-12px_rgba(139,92,246,0.5)]">
           <span className="break-all font-mono text-lg font-bold tabular-nums text-white sm:text-xl">
@@ -137,6 +136,6 @@ export default function PasswordTool() {
           )}
         </div>
       </div>
-    </div>
+    </ToolGrid>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
+import ToolGrid from "@/components/ToolGrid";
 
 // プリセットボタンに表示する時間(秒)。1分・3分・5分・10分・15分・30分。
 const PRESETS_SEC = [60, 180, 300, 600, 900, 1800];
@@ -225,9 +226,7 @@ export default function TimerTool() {
       <video ref={videoRef} muted playsInline className="pointer-events-none absolute h-px w-px opacity-0" />
       <canvas ref={canvasRef} width={PIP_WIDTH} height={PIP_HEIGHT} className="hidden" />
 
-      {/* 横幅に余裕がある画面ではスクロールせずに操作できるよう、
-          左に表示(残り時間・進捗)、右に操作(ボタン・プリセット・カスタム時間)を並べる。 */}
-      <div className="grid w-full gap-8 md:grid-cols-2 md:items-center">
+      <ToolGrid>
         <div className="flex flex-col items-center gap-6">
           <div
             className={`flex h-56 w-56 items-center justify-center rounded-full border-8 text-5xl font-bold tabular-nums transition-colors sm:h-64 sm:w-64 sm:text-6xl ${
@@ -329,7 +328,7 @@ export default function TimerTool() {
             </div>
           </div>
         </div>
-      </div>
+      </ToolGrid>
     </div>
   );
 }

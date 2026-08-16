@@ -10,28 +10,25 @@ import { useT } from "@/lib/i18n";
 // ガラス調のカード内に表示する。
 export default function ToolPageShell({
   tool,
-  adSlotTop,
   adSlotBottom,
   fullscreenEnabled = true,
   children,
 }: {
   tool: ToolMeta;
-  adSlotTop: string;
   adSlotBottom: string;
   fullscreenEnabled?: boolean;
   children: ReactNode;
 }) {
   const t = useT();
-  const toolT = t.tools[tool.slug as keyof typeof t.tools];
+  const toolT = t.tools[tool.slug];
 
   const cardRef = useRef<HTMLElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
-    const onChange = () => {
-      setIsFullscreen(document.fullscreenElement === cardRef.current);
-      window.dispatchEvent(new Event("resize"));
-    };
+    // 3Dシーンのcanvasはコンテナのbox sizeをResizeObserverで見ているため、
+    // fullscreen切り替え時のリサイズは自動で追従する(resizeイベントの手動発火は不要)。
+    const onChange = () => setIsFullscreen(document.fullscreenElement === cardRef.current);
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
@@ -46,8 +43,6 @@ export default function ToolPageShell({
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-      <AdSlot slot={adSlotTop} label={t.common.adTop(toolT.name)} />
-
       <section
         ref={cardRef}
         className={

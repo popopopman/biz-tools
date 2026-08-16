@@ -405,6 +405,15 @@ function Wheel({
   const n = Math.max(items.length, 1);
   const sliceAngle = (Math.PI * 2) / n;
 
+  // ラベルspriteのref代入コールバック。インラインの矢印関数だと毎レンダーで
+  // 参照が変わり、Reactが同じDOM/three.jsオブジェクトに対しても
+  // 古いコールバックをnullで呼んでから新しいコールバックを呼び直してしまう
+  // (=無駄なref付け外し)。項目数が変わらない限り同じ関数を再利用する。
+  const labelSpriteRefSetters = useMemo(
+    () => Array.from({ length: n }, (_, i) => (el: THREE.Sprite | null) => { labelSpriteRefs.current[i] = el; }),
+    [n]
+  );
+
   // 項目数に応じて、隣接スライスが同色にならないよう調整した配色。
   const wedgeColors = useMemo(() => assignWedgeColors(n), [n]);
 
@@ -698,9 +707,7 @@ function Wheel({
           return (
             <sprite
               key={`label-${i}`}
-              ref={(el) => {
-                labelSpriteRefs.current[i] = el;
-              }}
+              ref={labelSpriteRefSetters[i]}
               position={[Math.cos(mid) * r, Math.sin(mid) * r, 0.08]}
               scale={[labelScale[0], labelScale[1], 1]}
               renderOrder={10}

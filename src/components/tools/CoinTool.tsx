@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { CoinSide } from "@/lib/coin3d";
 import SceneErrorBoundary from "@/components/three/SceneErrorBoundary";
 import { useT } from "@/lib/i18n";
@@ -17,7 +17,10 @@ const CoinScene = dynamic(() => import("@/components/three/CoinScene"), {
 // 実際の回転アニメーション・結果の抽選はCoinScene(3D側)が行う。
 export default function CoinTool() {
   const t = useT();
-  const SIDE_LABEL: Record<CoinSide, string> = { front: t.coin.front, back: t.coin.back };
+  const SIDE_LABEL: Record<CoinSide, string> = useMemo(
+    () => ({ front: t.coin.front, back: t.coin.back }),
+    [t]
+  );
   // この値を更新するたびにCoinScene側で新しいトスが開始される。
   const [flipToken, setFlipToken] = useState(0);
   const [flipping, setFlipping] = useState(false);
@@ -88,7 +91,7 @@ export default function CoinTool() {
       {history.length > 0 && (
         <div className="w-full max-w-sm space-y-3">
           <div>
-            <p className="mb-1.5 text-xs font-medium text-white/50">{t.coin.history(history.length)}</p>
+            <p className="mb-1.5 text-xs font-medium text-white/50">{t.common.history(history.length)}</p>
             <div className="flex flex-wrap gap-1.5">
               {history.map((side, i) => (
                 <span

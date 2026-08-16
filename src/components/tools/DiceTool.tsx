@@ -111,7 +111,7 @@ export default function DiceTool() {
 
       {history.length > 0 && (
         <div className="w-full max-w-sm">
-          <p className="mb-1.5 text-xs font-medium text-white/50">{t.dice.history(history.length)}</p>
+          <p className="mb-1.5 text-xs font-medium text-white/50">{t.common.history(history.length)}</p>
           <div className="flex flex-wrap gap-1.5">
             {history.map((values, i) => (
               <span

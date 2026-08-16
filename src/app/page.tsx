@@ -25,11 +25,9 @@ export default function Home() {
         </p>
       </section>
 
-      <AdSlot slot="0000000001" label={t.common.adTop(t.home.adName)} />
-
       <section className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         {tools.map((tool) => {
-          const toolT = t.tools[tool.slug as keyof typeof t.tools];
+          const toolT = t.tools[tool.slug];
           return (
             <Link
               key={tool.slug}

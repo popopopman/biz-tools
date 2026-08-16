@@ -25,7 +25,7 @@ export default function SiteHeader() {
               href={`/${tool.slug}/`}
               className="rounded-full px-3 py-1.5 text-white/70 transition hover:bg-white/10 hover:text-white"
             >
-              {tool.emoji} {t.tools[tool.slug as keyof typeof t.tools].shortName}
+              {tool.emoji} {t.tools[tool.slug].shortName}
             </Link>
           ))}
         </nav>
@@ -76,7 +76,7 @@ export default function SiteHeader() {
               onClick={() => setOpen(false)}
               className="rounded-lg px-3 py-2 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
             >
-              {tool.emoji} {t.tools[tool.slug as keyof typeof t.tools].shortName}
+              {tool.emoji} {t.tools[tool.slug].shortName}
             </Link>
           ))}
         </div>

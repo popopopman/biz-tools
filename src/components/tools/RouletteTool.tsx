@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useState } from "react";
 import { useT } from "@/lib/i18n";
 import SceneLoading from "@/components/three/SceneLoading";
+import ToolGrid from "@/components/ToolGrid";
 
 // WebGLを使う3Dホイールはクライアントでのみ動作するため、ssr:falseで読み込む。
 const RouletteScene = dynamic(() => import("@/components/three/RouletteScene"), {
@@ -59,9 +60,7 @@ export default function RouletteTool() {
   ).sort((a, b) => b[1] - a[1]);
 
   return (
-    // 横幅に余裕がある画面ではスクロールせずに操作できるよう、
-    // 左にホイール、右に操作(スピンボタン・結果・項目編集)を並べる。
-    <div className="grid w-full gap-6 md:grid-cols-[3fr_2fr] md:items-start">
+    <ToolGrid wide>
       <div className="flex min-w-0 flex-col items-center gap-4">
         <div className="relative h-[320px] w-full overflow-hidden rounded-2xl border border-emerald-400/20 bg-gradient-to-b from-emerald-500/[.06] to-transparent sm:h-[480px]">
           <RouletteScene items={items} spinToken={spinToken} onResult={handleResult} />
@@ -93,7 +92,7 @@ export default function RouletteTool() {
             rows={8}
             className="w-full rounded-lg border border-white/15 bg-white/5 p-3 text-sm text-white"
           />
-          <p className="mt-1 text-xs text-white/40">{t.roulette.itemsCount(items.length)}</p>
+          <p className="mt-1 text-xs text-white/40">{t.common.itemsCount(items.length)}</p>
         </div>
 
         {/* 結果表示系のUI(直近の結果・履歴・集計)は一番下にまとめる。 */}
@@ -108,7 +107,7 @@ export default function RouletteTool() {
         {history.length > 0 && (
           <div className="w-full max-w-sm space-y-3">
             <div>
-              <p className="mb-1.5 text-xs font-medium text-white/50">{t.roulette.history(history.length)}</p>
+              <p className="mb-1.5 text-xs font-medium text-white/50">{t.common.history(history.length)}</p>
               <div className="flex flex-wrap gap-1.5">
                 {history.map((name, i) => (
                   <span
@@ -135,6 +134,6 @@ export default function RouletteTool() {
           </div>
         )}
       </div>
-    </div>
+    </ToolGrid>
   );
 }

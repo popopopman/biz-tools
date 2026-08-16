@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { GACHA_SINGLE_REVEAL_MS } from "@/lib/gachaTiming";
 import { useT } from "@/lib/i18n";
 import SceneLoading from "@/components/three/SceneLoading";
+import ToolGrid from "@/components/ToolGrid";
 
 // three.js(WebGL)を使う3Dシーンはサーバー側でレンダリングできないため、
 // ssr:falseの動的importでクライアントのみで読み込む。
@@ -96,9 +97,7 @@ export default function GachaTool() {
   };
 
   return (
-    // 横幅に余裕がある画面ではスクロールせずに操作できるよう、
-    // 左に演出、右に操作(引くボタン・参加者リスト・結果)を並べる。
-    <div className="grid w-full gap-6 md:grid-cols-[3fr_2fr] md:items-start">
+    <ToolGrid wide>
       <div className="flex min-w-0 w-full flex-col items-center gap-4">
         <div className="h-[360px] w-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[.04] to-transparent sm:h-[480px]">
           <GachaScene capacity={capacity} drawnCount={drawn.length} drawn={drawn} />
@@ -144,7 +143,7 @@ export default function GachaTool() {
             disabled={started}
             className="w-full rounded-lg border border-white/15 bg-white/5 p-3 text-sm text-white disabled:opacity-50"
           />
-          <p className="mt-1 text-xs text-white/40">{t.gacha.itemsCount(items.length)}</p>
+          <p className="mt-1 text-xs text-white/40">{t.common.itemsCount(items.length)}</p>
           {!started ? (
             <button
               onClick={startDraw}
@@ -180,6 +179,6 @@ export default function GachaTool() {
           )}
         </div>
       </div>
-    </div>
+    </ToolGrid>
   );
 }
