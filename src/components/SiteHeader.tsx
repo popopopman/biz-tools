@@ -3,18 +3,20 @@
 import Link from "next/link";
 import { useState } from "react";
 import { tools } from "@/lib/tools";
+import { useT } from "@/lib/i18n";
 
 // 全ページ共通のヘッダー。スクロールしても追従する半透明のガラス調バー。
 // ナビゲーションリンクはtools配列から自動生成される。
 // モバイル幅ではリンクを並べる余白がないため、ハンバーガーメニューに切り替える。
 export default function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const t = useT();
 
   return (
     <header className="glass-card site-header sticky top-0 z-40 border-x-0 border-t-0">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-4">
         <Link href="/" className="glow-text text-lg font-extrabold tracking-tight" onClick={() => setOpen(false)}>
-          🧰 便利ツール
+          {t.header.siteName}
         </Link>
         <nav className="hidden flex-wrap gap-x-1 gap-y-2 text-sm sm:flex">
           {tools.map((tool) => (
@@ -23,14 +25,14 @@ export default function SiteHeader() {
               href={`/${tool.slug}/`}
               className="rounded-full px-3 py-1.5 text-white/70 transition hover:bg-white/10 hover:text-white"
             >
-              {tool.emoji} {tool.shortName}
+              {tool.emoji} {t.tools[tool.slug as keyof typeof t.tools].shortName}
             </Link>
           ))}
         </nav>
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          aria-label="メニュー"
+          aria-label={t.header.menuLabel}
           aria-expanded={open}
           className="relative flex h-9 w-9 items-center justify-center rounded-lg text-white/80 transition hover:bg-white/10 sm:hidden"
         >
@@ -74,7 +76,7 @@ export default function SiteHeader() {
               onClick={() => setOpen(false)}
               className="rounded-lg px-3 py-2 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
             >
-              {tool.emoji} {tool.shortName}
+              {tool.emoji} {t.tools[tool.slug as keyof typeof t.tools].shortName}
             </Link>
           ))}
         </div>

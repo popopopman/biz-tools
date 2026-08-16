@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useT } from "@/lib/i18n";
 
 // プリセットボタンに表示する時間(秒)。1分・3分・5分・10分・15分・30分。
 const PRESETS_SEC = [60, 180, 300, 600, 900, 1800];
@@ -48,7 +49,7 @@ function playBeep() {
 
 // PinPウィンドウに表示する1フレームを描画する。
 // 残り時間の文字と、終了時は赤字＋メッセージを表示する。
-function drawPipFrame(canvas: HTMLCanvasElement, label: string, finished: boolean) {
+function drawPipFrame(canvas: HTMLCanvasElement, label: string, finished: boolean, finishedLabel: string) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -66,11 +67,12 @@ function drawPipFrame(canvas: HTMLCanvasElement, label: string, finished: boolea
 
   if (finished) {
     ctx.font = "600 20px system-ui, sans-serif";
-    ctx.fillText("時間になりました", canvas.width / 2, canvas.height / 2 + 48);
+    ctx.fillText(finishedLabel, canvas.width / 2, canvas.height / 2 + 48);
   }
 }
 
 export default function TimerTool() {
+  const t = useT();
   const [durationSec, setDurationSec] = useState(300);
   const [remainingSec, setRemainingSec] = useState(300);
   const [running, setRunning] = useState(false);
@@ -129,8 +131,8 @@ export default function TimerTool() {
   // (PinPウィンドウを開いていない間も描画自体は続けておき、
   //  開いた瞬間に最新の状態がすぐ映るようにしている)
   useEffect(() => {
-    if (canvasRef.current) drawPipFrame(canvasRef.current, formatTime(remainingSec), finished);
-  }, [remainingSec, finished]);
+    if (canvasRef.current) drawPipFrame(canvasRef.current, formatTime(remainingSec), finished, t.timer.finishedShort);
+  }, [remainingSec, finished, t]);
 
   const togglePip = async () => {
     const video = videoRef.current;
@@ -143,7 +145,7 @@ export default function TimerTool() {
       }
       if (!video.srcObject) {
         // captureStreamは初回のみ生成し、以後は同じstreamを使い回す。
-        drawPipFrame(canvas, formatTime(remainingSec), finished);
+        drawPipFrame(canvas, formatTime(remainingSec), finished, t.timer.finishedShort);
         video.srcObject = canvas.captureStream(30);
         await video.play();
       }
@@ -218,106 +220,114 @@ export default function TimerTool() {
   const progress = durationSec > 0 ? 1 - remainingSec / durationSec : 0;
 
   return (
-    <div className="relative mx-auto flex max-w-xl flex-col items-center gap-6">
+    <div className="relative flex w-full flex-col items-center gap-6">
       {/* PinP用の隠しvideo/canvas。画面には表示しないが、DOMには存在させておく必要がある */}
       <video ref={videoRef} muted playsInline className="pointer-events-none absolute h-px w-px opacity-0" />
       <canvas ref={canvasRef} width={PIP_WIDTH} height={PIP_HEIGHT} className="hidden" />
 
-      <div
-        className={`flex h-56 w-56 items-center justify-center rounded-full border-8 text-5xl font-bold tabular-nums transition-colors sm:h-64 sm:w-64 sm:text-6xl ${
-          finished ? "animate-pulse border-red-500 text-red-400" : "border-indigo-500/70 text-white"
-        }`}
-        style={{ boxShadow: finished ? "0 0 40px -8px rgba(248,113,113,0.6)" : "0 0 40px -12px rgba(99,102,241,0.5)" }}
-      >
-        {formatTime(remainingSec)}
-      </div>
-
-      <div className="h-2 w-full max-w-sm overflow-hidden rounded-full bg-white/10">
-        <div
-          className="h-full bg-gradient-to-r from-indigo-500 to-fuchsia-500 transition-[width]"
-          style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%` }}
-        />
-      </div>
-
-      {finished && <p className="text-lg font-semibold text-red-400">時間になりました！</p>}
-
-      <div className="flex flex-wrap justify-center gap-3">
-        {!running ? (
-          <button
-            onClick={start}
-            className="glow-btn rounded-lg bg-indigo-600 px-6 py-2 font-medium text-white hover:bg-indigo-500"
+      {/* 横幅に余裕がある画面ではスクロールせずに操作できるよう、
+          左に表示(残り時間・進捗)、右に操作(ボタン・プリセット・カスタム時間)を並べる。 */}
+      <div className="grid w-full gap-8 md:grid-cols-2 md:items-center">
+        <div className="flex flex-col items-center gap-6">
+          <div
+            className={`flex h-56 w-56 items-center justify-center rounded-full border-8 text-5xl font-bold tabular-nums transition-colors sm:h-64 sm:w-64 sm:text-6xl ${
+              finished ? "animate-pulse border-red-500 text-red-400" : "border-indigo-500/70 text-white"
+            }`}
+            style={{ boxShadow: finished ? "0 0 40px -8px rgba(248,113,113,0.6)" : "0 0 40px -12px rgba(99,102,241,0.5)" }}
           >
-            スタート
-          </button>
-        ) : (
-          <button
-            onClick={pause}
-            className="glow-btn rounded-lg bg-amber-500 px-6 py-2 font-medium text-white hover:bg-amber-400"
-          >
-            一時停止
-          </button>
-        )}
-        <button
-          onClick={reset}
-          className="rounded-lg border border-white/15 px-6 py-2 font-medium text-white/80 hover:bg-white/10"
-        >
-          リセット
-        </button>
-        {pipSupported && (
-          <button
-            onClick={togglePip}
-            className="rounded-lg border border-white/15 px-6 py-2 font-medium text-white/80 hover:bg-white/10"
-          >
-            {pipActive ? "PinP終了" : "PinPで表示"}
-          </button>
-        )}
-      </div>
+            {formatTime(remainingSec)}
+          </div>
 
-      <div className="w-full">
-        <p className="mb-2 text-sm font-medium text-white/60">プリセット</p>
-        <div className="flex flex-wrap gap-2">
-          {PRESETS_SEC.map((sec) => (
-            <button
-              key={sec}
-              onClick={() => applyPreset(sec)}
-              className={`rounded-full border px-4 py-1.5 text-sm ${
-                durationSec === sec
-                  ? "border-indigo-500 bg-indigo-600 text-white"
-                  : "border-white/15 text-white/70 hover:bg-white/10"
-              }`}
-            >
-              {sec % 60 === 0 ? `${sec / 60}分` : `${sec}秒`}
-            </button>
-          ))}
+          <div className="h-2 w-full max-w-sm overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full bg-gradient-to-r from-indigo-500 to-fuchsia-500 transition-[width]"
+              style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%` }}
+            />
+          </div>
+
+          {finished && <p className="text-lg font-semibold text-red-400">{t.timer.finished}</p>}
         </div>
-      </div>
 
-      <div className="w-full">
-        <p className="mb-2 text-sm font-medium text-white/60">カスタム時間</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="number"
-            min={0}
-            value={minutesInput}
-            onChange={(e) => setMinutesInput(e.target.value)}
-            className="w-20 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-white"
-          />
-          <span className="text-sm text-white/70">分</span>
-          <input
-            type="number"
-            min={0}
-            max={59}
-            value={secondsInput}
-            onChange={(e) => setSecondsInput(e.target.value)}
-            className="w-20 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-white"
-          />
-          <span className="text-sm text-white/70">秒</span>
-          <button
-            onClick={applyCustom}
-            className="rounded-lg border border-white/15 px-4 py-1.5 text-sm text-white/80 hover:bg-white/10"
-          >
-            設定
-          </button>
+        <div className="flex flex-col items-center gap-6">
+          <div className="flex flex-wrap justify-center gap-3">
+            {!running ? (
+              <button
+                onClick={start}
+                className="glow-btn rounded-lg bg-indigo-600 px-6 py-2 font-medium text-white hover:bg-indigo-500"
+              >
+                {t.timer.start}
+              </button>
+            ) : (
+              <button
+                onClick={pause}
+                className="glow-btn rounded-lg bg-amber-500 px-6 py-2 font-medium text-white hover:bg-amber-400"
+              >
+                {t.timer.pause}
+              </button>
+            )}
+            <button
+              onClick={reset}
+              className="rounded-lg border border-white/15 px-6 py-2 font-medium text-white/80 hover:bg-white/10"
+            >
+              {t.timer.reset}
+            </button>
+            {pipSupported && (
+              <button
+                onClick={togglePip}
+                className="rounded-lg border border-white/15 px-6 py-2 font-medium text-white/80 hover:bg-white/10"
+              >
+                {pipActive ? t.timer.pipEnd : t.timer.pipShow}
+              </button>
+            )}
+          </div>
+
+          <div className="w-full max-w-sm">
+            <p className="mb-2 text-sm font-medium text-white/60">{t.timer.presetLabel}</p>
+            <div className="flex flex-wrap gap-2">
+              {PRESETS_SEC.map((sec) => (
+                <button
+                  key={sec}
+                  onClick={() => applyPreset(sec)}
+                  className={`rounded-full border px-4 py-1.5 text-sm ${
+                    durationSec === sec
+                      ? "border-indigo-500 bg-indigo-600 text-white"
+                      : "border-white/15 text-white/70 hover:bg-white/10"
+                  }`}
+                >
+                  {t.timer.presetChip(sec)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="w-full max-w-sm">
+            <p className="mb-2 text-sm font-medium text-white/60">{t.timer.customTimeLabel}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                value={minutesInput}
+                onChange={(e) => setMinutesInput(e.target.value)}
+                className="w-20 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-white"
+              />
+              <span className="text-sm text-white/70">{t.timer.minuteUnit}</span>
+              <input
+                type="number"
+                min={0}
+                max={59}
+                value={secondsInput}
+                onChange={(e) => setSecondsInput(e.target.value)}
+                className="w-20 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-white"
+              />
+              <span className="text-sm text-white/70">{t.timer.secondUnit}</span>
+              <button
+                onClick={applyCustom}
+                className="rounded-lg border border-white/15 px-4 py-1.5 text-sm text-white/80 hover:bg-white/10"
+              >
+                {t.timer.setButton}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

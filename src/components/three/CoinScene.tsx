@@ -391,7 +391,7 @@ export default function CoinScene({
         });
       }}
     >
-      <ResponsiveCamera baseFov={42} referenceAspect={672 / 560} basePosition={[0, 7.6, 7.6]} />
+      <ResponsiveCamera baseFov={42} referenceAspect={672 / 560} basePosition={[0, 7.6, 7.6]} pushBackStrength={-1} />
       <ambientLight intensity={0.6} color="#fff2df" />
       <directionalLight position={[6, 10, 5]} intensity={1.25} color="#fff4e0" />
       <pointLight position={[-3, 3, 3]} intensity={0.45} color="#fde68a" />

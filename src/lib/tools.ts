@@ -44,20 +44,20 @@ export const tools: ToolMeta[] = [
     accent: "#d97706",
   },
   {
-    slug: "password",
-    name: "パスワード生成",
-    shortName: "パスワード",
-    emoji: "🔑",
-    description: "文字種と桁数を選んで安全なパスワードを生成。ワンクリックでコピー可能。",
-    accent: "#7c3aed",
-  },
-  {
     slug: "coin",
     name: "コイントス",
     shortName: "コイントス",
     emoji: "🪙",
     description: "3Dコインを投げて表裏を決める。二択の決定やゲームの先攻/後攻決めに。",
     accent: "#eab308",
+  },
+  {
+    slug: "password",
+    name: "パスワード生成",
+    shortName: "パスワード",
+    emoji: "🔑",
+    description: "文字種と桁数を選んで安全なパスワードを生成。ワンクリックでコピー可能。",
+    accent: "#7c3aed",
   },
 ];
 

@@ -3,19 +3,15 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { GACHA_SINGLE_REVEAL_MS } from "@/lib/gachaTiming";
+import { useT } from "@/lib/i18n";
+import SceneLoading from "@/components/three/SceneLoading";
 
 // three.js(WebGL)を使う3Dシーンはサーバー側でレンダリングできないため、
 // ssr:falseの動的importでクライアントのみで読み込む。
 const GachaScene = dynamic(() => import("@/components/three/GachaScene"), {
   ssr: false,
-  loading: () => (
-    <div className="flex h-full w-full items-center justify-center text-sm text-white/40">
-      3Dシーンを読み込み中…
-    </div>
-  ),
+  loading: SceneLoading,
 });
-
-const DEFAULT_ITEMS = ["Aさん", "Bさん", "Cさん", "Dさん", "Eさん"];
 
 // Fisher-Yatesシャッフル。全ての並び順が等確率で出現する標準的なアルゴリズム。
 function shuffle<T>(arr: T[]): T[] {
@@ -38,7 +34,8 @@ function shuffle<T>(arr: T[]): T[] {
 // 結果のテキスト(drawnリスト表示)は演出のネタバレにならないよう、
 // 演出がひと通り終わるタイミング(GACHA_*_REVEAL_MS)までrevealedCountで表示を遅らせている。
 export default function GachaTool() {
-  const [itemsText, setItemsText] = useState(DEFAULT_ITEMS.join("\n"));
+  const t = useT();
+  const [itemsText, setItemsText] = useState(t.gacha.defaultItems.join("\n"));
   // null = まだガチャを準備していない状態。配列 = ガチャの中身(残り)。
   const [pool, setPool] = useState<string[] | null>(null);
   const [drawn, setDrawn] = useState<string[]>([]);
@@ -99,84 +96,89 @@ export default function GachaTool() {
   };
 
   return (
-    <div className="flex flex-col items-center gap-6">
-      <div className="flex w-full max-w-2xl flex-col items-center gap-4">
+    // 横幅に余裕がある画面ではスクロールせずに操作できるよう、
+    // 左に演出、右に操作(引くボタン・参加者リスト・結果)を並べる。
+    <div className="grid w-full gap-6 md:grid-cols-[3fr_2fr] md:items-start">
+      <div className="flex w-full flex-col items-center gap-4">
         <div className="h-[360px] w-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[.04] to-transparent sm:h-[480px]">
           <GachaScene capacity={capacity} drawnCount={drawn.length} drawn={drawn} />
         </div>
 
         <p className="text-sm text-white/60">
           {revealing
-            ? "演出中…"
+            ? t.gacha.revealing
             : started
               ? pool && pool.length > 0
-                ? `残り ${pool.length} 件`
-                : "ガチャは空です"
-              : "「ガチャを準備する」を押してください"}
+                ? t.gacha.remaining(pool.length)
+                : t.gacha.empty
+              : t.gacha.prompt}
         </p>
-
-        <div className="flex w-full max-w-xs gap-2">
-          <button
-            onClick={drawOne}
-            disabled={!started || (pool?.length ?? 0) === 0 || revealing}
-            className="glow-btn flex-1 rounded-lg bg-cyan-600 px-4 py-2.5 font-medium text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            1件引く
-          </button>
-          <button
-            onClick={drawAll}
-            disabled={!started || (pool?.length ?? 0) === 0 || revealing}
-            className="flex-1 rounded-lg border border-white/15 px-4 py-2.5 font-medium text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            残り全部引く
-          </button>
-        </div>
       </div>
 
-      <div className="w-full max-w-sm">
-        <label className="mb-2 block text-sm font-medium text-white/60">
-          参加者・項目（1行に1つ、2件以上）
-        </label>
-        <textarea
-          value={itemsText}
-          onChange={(e) => setItemsText(e.target.value)}
-          rows={8}
-          disabled={started}
-          className="w-full rounded-lg border border-white/15 bg-white/5 p-3 text-sm text-white disabled:opacity-50"
-        />
-        <p className="mt-1 text-xs text-white/40">{items.length} 件登録中</p>
-        {!started ? (
-          <button
-            onClick={startDraw}
-            disabled={items.length < 2}
-            className="glow-btn mt-3 w-full rounded-lg bg-cyan-600 px-6 py-2.5 font-medium text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            ガチャを準備する
-          </button>
-        ) : (
-          <button
-            onClick={reset}
-            className="mt-3 w-full rounded-lg border border-white/15 px-6 py-2 text-sm text-white/80 hover:bg-white/10"
-          >
-            リストを編集し直す
-          </button>
-        )}
+      <div className="flex w-full flex-col items-center">
+        <div className="w-full max-w-sm">
+          <label className="mb-2 block text-sm font-medium text-white/60">
+            {t.gacha.itemsLabel}
+          </label>
+          <textarea
+            value={itemsText}
+            onChange={(e) => setItemsText(e.target.value)}
+            rows={8}
+            disabled={started}
+            className="w-full rounded-lg border border-white/15 bg-white/5 p-3 text-sm text-white disabled:opacity-50"
+          />
+          <p className="mt-1 text-xs text-white/40">{t.gacha.itemsCount(items.length)}</p>
+          {!started ? (
+            <button
+              onClick={startDraw}
+              disabled={items.length < 2}
+              className="glow-btn mt-3 w-full rounded-lg bg-cyan-600 px-6 py-2.5 font-medium text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {t.gacha.prepare}
+            </button>
+          ) : (
+            <button
+              onClick={reset}
+              className="mt-3 w-full rounded-lg border border-white/15 px-6 py-2 text-sm text-white/80 hover:bg-white/10"
+            >
+              {t.gacha.editList}
+            </button>
+          )}
 
-        {revealedCount > 0 && (
-          <ol className="mt-4 space-y-1.5">
-            {drawn.slice(0, revealedCount).map((name, i) => (
-              <li
-                key={`${name}-${i}`}
-                className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
-              >
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white">
-                  {i + 1}
-                </span>
-                {name}
-              </li>
-            ))}
-          </ol>
-        )}
+          <div className="mt-4 flex w-full gap-2">
+            <button
+              onClick={drawOne}
+              disabled={!started || (pool?.length ?? 0) === 0 || revealing}
+              className="glow-btn flex-1 rounded-lg bg-cyan-600 px-4 py-2.5 font-medium text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {t.gacha.drawOne}
+            </button>
+            <button
+              onClick={drawAll}
+              disabled={!started || (pool?.length ?? 0) === 0 || revealing}
+              className="flex-1 rounded-lg border border-white/15 px-4 py-2.5 font-medium text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {t.gacha.drawAll}
+            </button>
+          </div>
+
+          {/* 結果表示系のUI(引いた結果一覧)は一番下にまとめる。 */}
+          {revealedCount > 0 && (
+            <ol className="mt-4 space-y-1.5">
+              {drawn.slice(0, revealedCount).map((name, i) => (
+                <li
+                  key={`${name}-${i}`}
+                  className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+                >
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white">
+                    {i + 1}
+                  </span>
+                  {name}
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
       </div>
     </div>
   );

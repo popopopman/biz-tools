@@ -4,22 +4,20 @@ import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
 import type { CoinSide } from "@/lib/coin3d";
 import SceneErrorBoundary from "@/components/three/SceneErrorBoundary";
+import { useT } from "@/lib/i18n";
+import SceneLoading from "@/components/three/SceneLoading";
 
 // WebGLを使う3Dコインはクライアントでのみ動作するため、ssr:falseで読み込む。
 const CoinScene = dynamic(() => import("@/components/three/CoinScene"), {
   ssr: false,
-  loading: () => (
-    <div className="flex h-full w-full items-center justify-center text-sm text-white/40">
-      3Dシーンを読み込み中…
-    </div>
-  ),
+  loading: SceneLoading,
 });
-
-const SIDE_LABEL: Record<CoinSide, string> = { front: "表", back: "裏" };
 
 // コイントスツールの外枠。「トスする」ボタンと結果・履歴表示を担当し、
 // 実際の回転アニメーション・結果の抽選はCoinScene(3D側)が行う。
 export default function CoinTool() {
+  const t = useT();
+  const SIDE_LABEL: Record<CoinSide, string> = { front: t.coin.front, back: t.coin.back };
   // この値を更新するたびにCoinScene側で新しいトスが開始される。
   const [flipToken, setFlipToken] = useState(0);
   const [flipping, setFlipping] = useState(false);
@@ -49,67 +47,71 @@ export default function CoinTool() {
   const backCount = history.length - frontCount;
 
   return (
-    <div className="flex flex-col items-center gap-6">
-      <div className="h-[380px] w-full max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[.04] to-transparent sm:h-[560px]">
+    // 横幅に余裕がある画面ではスクロールせずに操作できるよう、
+    // 左にシーン、右に操作(トスボタン・結果・履歴)を並べる。
+    <div className="grid w-full gap-6 md:grid-cols-[3fr_2fr] md:items-start">
+      <div className="h-[380px] w-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[.04] to-transparent sm:h-[560px]">
         <SceneErrorBoundary>
           <CoinScene trigger={flipToken} onResult={handleResult} />
         </SceneErrorBoundary>
       </div>
 
-      {/* コイン本体の表(金色)・裏(銀色)と同じグラデーションを凡例の丸に使い、
-          実際の見た目の色そのままで表裏を判断できるようにしている。 */}
-      <div className="flex items-center gap-4 text-xs text-white/50">
-        <span className="flex items-center gap-1.5">
-          <span
-            className="inline-block h-3.5 w-3.5 rounded-full"
-            style={{ background: "linear-gradient(135deg, #fff6cf, #c99a2e)" }}
-          />
-          表
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span
-            className="inline-block h-3.5 w-3.5 rounded-full"
-            style={{ background: "linear-gradient(135deg, #f5f5f5, #9a9a9a)" }}
-          />
-          裏
-        </span>
-      </div>
+      <div className="flex flex-col items-center gap-6">
+        {/* コイン本体の表(金色)・裏(銀色)と同じグラデーションを凡例の丸に使い、
+            実際の見た目の色そのままで表裏を判断できるようにしている。 */}
+        <div className="flex items-center gap-4 text-xs text-white/50">
+          <span className="flex items-center gap-1.5">
+            <span
+              className="inline-block h-3.5 w-3.5 rounded-full"
+              style={{ background: "linear-gradient(135deg, #fff6cf, #c99a2e)" }}
+            />
+            {t.coin.front}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span
+              className="inline-block h-3.5 w-3.5 rounded-full"
+              style={{ background: "linear-gradient(135deg, #f5f5f5, #9a9a9a)" }}
+            />
+            {t.coin.back}
+          </span>
+        </div>
 
-      <button
-        onClick={flip}
-        disabled={flipping}
-        className="glow-btn rounded-lg bg-yellow-600 px-8 py-2.5 font-medium text-white hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {flipping ? "トス中…" : "トスする"}
-      </button>
+        <button
+          onClick={flip}
+          disabled={flipping}
+          className="glow-btn rounded-lg bg-yellow-600 px-8 py-2.5 font-medium text-white hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {flipping ? t.coin.flipping : t.coin.flip}
+        </button>
 
-      <div className="h-8 text-lg font-semibold text-white">
-        {result && <span>結果: {SIDE_LABEL[result]} 🪙</span>}
-      </div>
+        <div className="h-8 text-lg font-semibold text-white">
+          {result && <span>{t.coin.result(SIDE_LABEL[result])}</span>}
+        </div>
 
-      {history.length > 0 && (
-        <div className="w-full max-w-sm space-y-3">
-          <div>
-            <p className="mb-1.5 text-xs font-medium text-white/50">履歴(直近{history.length}回、新しい順)</p>
-            <div className="flex flex-wrap gap-1.5">
-              {history.map((side, i) => (
-                <span
-                  key={i}
-                  className={`rounded-full px-2.5 py-1 text-xs ${
-                    i === 0 ? "bg-yellow-600 text-white" : "bg-white/10 text-white/70"
-                  }`}
-                >
-                  {SIDE_LABEL[side]}
-                </span>
-              ))}
+        {history.length > 0 && (
+          <div className="w-full max-w-sm space-y-3">
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-white/50">{t.coin.history(history.length)}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {history.map((side, i) => (
+                  <span
+                    key={i}
+                    className={`rounded-full px-2.5 py-1 text-xs ${
+                      i === 0 ? "bg-yellow-600 text-white" : "bg-white/10 text-white/70"
+                    }`}
+                  >
+                    {SIDE_LABEL[side]}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-center gap-4 text-xs text-white/60">
+              <span>{t.coin.front} ×{frontCount}</span>
+              <span>{t.coin.back} ×{backCount}</span>
             </div>
           </div>
-          <div className="flex justify-center gap-4 text-xs text-white/60">
-            <span>表 ×{frontCount}</span>
-            <span>裏 ×{backCount}</span>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

@@ -279,6 +279,18 @@ const SPINS = 5;
 const DURATION = 4.2;
 // 当選スライスの発光パルスが続く秒数。
 const GLOW_DURATION = 1.3;
+// 通常時のラベル幅の上限(項目数が少ない時にこの幅で頭打ちになる)。
+const MAX_LABEL_WIDTH = 0.85;
+// ラベルの縦横比(幅に対する高さの比率)。
+const LABEL_ASPECT = 0.32 / 0.85;
+// 当選ラベルの文字を拡大する倍率(等倍からこの倍率へ滑らかに近づける)。
+const LABEL_WIN_SCALE = 1.35;
+// 当選ラベルの目標サイズ。項目数が増えて通常のラベルが小さくなっていても、
+// 当選時は常にこの一定サイズまで拡大する(=誰が当たったか項目数によらず読める)。
+const WINNER_LABEL_SCALE: [number, number] = [
+  MAX_LABEL_WIDTH * LABEL_WIN_SCALE,
+  MAX_LABEL_WIDTH * LABEL_WIN_SCALE * LABEL_ASPECT,
+];
 // ペグがポインター通過時に光る、ごく短い発光パルスの秒数(クリック音と同期させるため短め)。
 const PEG_FLASH_DURATION = 0.15;
 
@@ -360,6 +372,10 @@ function Wheel({
   // 当選スライスの発光パルス演出。停止直後に光り、1秒強で自然に消える。
   const glow = useRef({ index: -1, startTime: 0 });
   const wedgeMaterialRefs = useRef<(THREE.MeshStandardMaterial | null)[]>([]);
+  // 当選ラベルの文字拡大演出。発光と違って自然には減衰させず、次のスピンが
+  // 始まるまで拡大したまま保持する(結果が誰の目にも分かりやすいように)。
+  const winnerIndexRef = useRef(-1);
+  const labelSpriteRefs = useRef<(THREE.Sprite | null)[]>([]);
   // 回転中にポインターが仕切りを何個越えたか(クリック音を鳴らすタイミングの判定用)。
   const lastBoundary = useRef(0);
   // ポインターを通過した瞬間に光らせるペグの発光パルス(クリック音と同期させる)。
@@ -440,8 +456,8 @@ function Wheel({
   const labelScale = useMemo<[number, number]>(() => {
     const labelRadius = RADIUS * 0.62;
     const maxWidth = 2 * labelRadius * Math.sin(sliceAngle / 2) * 0.85;
-    const width = Math.min(0.85, maxWidth);
-    return [width, width * (0.32 / 0.85)];
+    const width = Math.min(MAX_LABEL_WIDTH, maxWidth);
+    return [width, width * LABEL_ASPECT];
   }, [sliceAngle]);
 
 
@@ -477,7 +493,15 @@ function Wheel({
       targetIndex,
     };
     // 新しいロールが始まったら、前回の当選演出が残っていれば消しておく。
+    // glow.current.indexをただ-1にするだけだと、発光の減衰(1.3秒)が終わる前に
+    // 再度回した場合にその時点のemissiveIntensityが残ったままになってしまうため、
+    // 直前の当選スライスがあれば明示的に消灯させてからリセットする。
+    if (glow.current.index >= 0) {
+      const prevMaterial = wedgeMaterialRefs.current[glow.current.index];
+      if (prevMaterial) prevMaterial.emissiveIntensity = 0;
+    }
     glow.current = { index: -1, startTime: 0 };
+    winnerIndexRef.current = -1;
     lastBoundary.current = Math.floor(current / sliceAngle);
     // 前回の当選でカメラが寄ったままなら、通常視点に戻し始める。
     zoom.current.dir = -1;
@@ -506,6 +530,7 @@ function Wheel({
       if (t >= 1) {
         s.spinning = false;
         glow.current = { index: s.targetIndex, startTime: now };
+        winnerIndexRef.current = s.targetIndex;
         shakeTime.current = 0.35;
         zoom.current.dir = 1;
         onResult(s.winner);
@@ -521,6 +546,16 @@ function Wheel({
         material.emissiveIntensity = elapsed < GLOW_DURATION ? Math.sin((elapsed / GLOW_DURATION) * Math.PI) * 1.6 : 0;
       }
       if (elapsed >= GLOW_DURATION) glow.current = { index: -1, startTime: 0 };
+    }
+
+    // 当選ラベルの拡大(対象は項目数によらず一定サイズへ、他は通常サイズへ、毎フレーム滑らかに近づける)。
+    const labelDamp = 1 - Math.exp(-10 * delta);
+    for (let i = 0; i < labelSpriteRefs.current.length; i += 1) {
+      const sprite = labelSpriteRefs.current[i];
+      if (!sprite) continue;
+      const target = i === winnerIndexRef.current ? WINNER_LABEL_SCALE : labelScale;
+      sprite.scale.x = THREE.MathUtils.lerp(sprite.scale.x, target[0], labelDamp);
+      sprite.scale.y = THREE.MathUtils.lerp(sprite.scale.y, target[1], labelDamp);
     }
 
     // ペグの発光パルス(通過直後にパッと光ってすぐ消える)。
@@ -663,6 +698,9 @@ function Wheel({
           return (
             <sprite
               key={`label-${i}`}
+              ref={(el) => {
+                labelSpriteRefs.current[i] = el;
+              }}
               position={[Math.cos(mid) * r, Math.sin(mid) * r, 0.08]}
               scale={[labelScale[0], labelScale[1], 1]}
               renderOrder={10}
