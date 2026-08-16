@@ -13,6 +13,7 @@ import {
 } from "@/lib/wheelTexture";
 import { buildCasinoFeltTexture } from "@/lib/casinoFeltTexture";
 import { playTick, playWinChime } from "@/lib/rouletteAudio";
+import { useResponsiveFov, useResponsiveDistanceScale } from "@/lib/useResponsiveFov";
 
 // 当選演出用の紙ふぶきの数・色(ゴールド基調のきらびやかな配色)。
 const CONFETTI_COUNT = 48;
@@ -375,6 +376,11 @@ function Wheel({
   useEffect(() => {
     baseCameraPos.current = camera.position.clone();
   }, [camera]);
+  // スマホ縦画面など縦長のcanvasでもカメラが遠く感じないよう、fov・カメラ距離を補正する。
+  // カメラ位置は下のuseFrameで毎フレーム自前計算しているため、専用コンポーネントは使わず
+  // ここでhookを直接使ってその計算に組み込む。
+  const fovRef = useResponsiveFov(42, 672 / 560);
+  const distanceScaleRef = useResponsiveDistanceScale(672 / 560);
   // 当選確定後、カメラが当選項目とポインターの周辺にじわっと寄っていく演出。
   // t: 0(通常視点)〜1(寄り切った視点)、dir: +1で寄る/-1で戻る/0で静止(その場で保持)。
   const zoom = useRef({ t: 0, dir: 0 as -1 | 0 | 1 });
@@ -478,7 +484,7 @@ function Wheel({
   }, [spinToken, items, n, sliceAngle]);
 
   // 毎フレーム、経過時間に応じてイージングをかけながら回転角を更新する。
-  useFrame((_, delta) => {
+  useFrame(({ camera: frameCamera }, delta) => {
     const s = anim.current;
     if (s.spinning && spinRef.current) {
       const now = performance.now() / 1000;
@@ -542,9 +548,13 @@ function Wheel({
       z.t = THREE.MathUtils.clamp(z.t + (z.dir * delta) / duration, 0, 1);
       if ((z.dir > 0 && z.t >= 1) || (z.dir < 0 && z.t <= 0)) z.dir = 0;
     }
+    if (frameCamera instanceof THREE.PerspectiveCamera && frameCamera.fov !== fovRef.current) {
+      frameCamera.fov = fovRef.current;
+      frameCamera.updateProjectionMatrix();
+    }
     if (baseCameraPos.current) {
       const eased = easeOutQuint(z.t);
-      const pos = baseCameraPos.current.clone().lerp(ZOOM_CAMERA_POS, eased);
+      const pos = baseCameraPos.current.clone().lerp(ZOOM_CAMERA_POS, eased).multiplyScalar(distanceScaleRef.current);
       if (shakeTime.current > 0) {
         const strength = 0.06 * (shakeTime.current / 0.35);
         pos.x += (Math.random() - 0.5) * strength;

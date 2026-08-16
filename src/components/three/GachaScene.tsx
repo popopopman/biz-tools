@@ -16,6 +16,7 @@ import {
   GACHA_BURST_HOLD,
 } from "@/lib/gachaTiming";
 import { playMeteorWhoosh, playImpactThud, playExplosionBoom, playRevealChime } from "@/lib/gachaAudio";
+import { useResponsiveFov } from "@/lib/useResponsiveFov";
 
 // 「空が光り、おとりの隕石を何個か落としてから本命の隕石が降ってくる → 着弾で大きく爆発する」演出。
 //   1. おとり: 本命の前に、小さな隕石が何個か落ちてきては小さく着弾する(期待感を煽る)
@@ -529,6 +530,9 @@ function GachaRig({
   // startTimeもこのclockから読む必要がある(performance.now()は壁時計時刻で基準が違い、
   // 引き算すると巨大な負の値になってslotIndexが配列範囲外になってしまう)。
   const { clock } = useThree();
+  // スマホ縦画面などcanvasが縦長(aspect<1)になっても横方向の見える範囲が
+  // 狭くなりすぎないよう、基準fov(BASE_FOV)をアスペクト比に応じて補正する。
+  const baseFovRef = useResponsiveFov(BASE_FOV, 672 / 480);
   const circleGroupRef = useRef<THREE.Group>(null);
   const groundMeshRef = useRef<THREE.Mesh>(null);
   const groundMatRef = useRef<THREE.MeshStandardMaterial>(null);
@@ -849,7 +853,7 @@ function GachaRig({
 
     // カメラのFOVパンチ: 爆発の瞬間だけ視野角を一瞬広げ、画面全体を揺さぶるような衝撃にする。
     if (camera instanceof THREE.PerspectiveCamera) {
-      const targetFov = BASE_FOV + flashP * FOV_PUNCH;
+      const targetFov = baseFovRef.current + flashP * FOV_PUNCH;
       if (camera.fov !== targetFov) {
         camera.fov = targetFov;
         camera.updateProjectionMatrix();

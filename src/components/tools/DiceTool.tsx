@@ -50,7 +50,7 @@ export default function DiceTool() {
 
   return (
     <div className="flex flex-col items-center gap-6">
-      <div className="h-[560px] w-full max-w-4xl overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[.04] to-transparent">
+      <div className="h-[380px] w-full max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[.04] to-transparent sm:h-[560px]">
         <DiceScene count={count} trigger={trigger} onAllSettled={handleAllSettled} />
       </div>
 

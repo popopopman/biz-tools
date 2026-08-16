@@ -9,6 +9,7 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import { valueFromQuaternion, alignedQuaternion, pipTexture, pipNormalTexture, FACE_VALUES } from "@/lib/dice3d";
 import { playDiceKnock } from "@/lib/diceSound";
 import { buildFeltColorTexture, buildFeltNormalTexture } from "@/lib/feltTexture";
+import ResponsiveCamera from "@/components/three/ResponsiveCamera";
 
 // ダイス本体のサイズと角の丸め具合。黒い立方体でおなじみの、角がわずかに
 // 丸まったダイスの見た目にする。
@@ -48,6 +49,10 @@ const WALL_HEIGHT = 6;
 const SETTLE_LIN_SPEED = 0.05;
 const SETTLE_ANG_SPEED = 0.1;
 const SETTLE_HOLD = 0.25;
+// 個数が多いと他のサイコロとの接触が増え、速度が閾値をわずかに超え続けて
+// いつまでも「静止」と判定できないことがある。その場合でも一定時間で
+// 強制的にその時点の姿勢で確定させ、個数によって挙動が変わらないようにする。
+const MAX_ROLL_DURATION = 3;
 // 整列スライドアニメーションの秒数(DiceScene側の完了通知タイミングとも合わせる)。
 const ALIGN_DURATION = 0.5;
 
@@ -151,20 +156,31 @@ function Die({
   idlePos,
   trigger,
   alignSignal,
+  layoutSignal,
   onSettle,
 }: {
   index: number;
   idlePos: [number, number];
   trigger: number;
   alignSignal: number;
+  layoutSignal: number;
   onSettle: (index: number, value: number) => void;
 }) {
   const bodyRef = useRef<RapierRigidBody>(null);
   const geometry = dieGeometry;
-  const lastTrigger = useRef(0);
-  const lastAlignSignal = useRef(0);
+  // countが増えて新しいDieがマウントされた時、現在のtrigger/alignSignalを
+  // 「未処理の新しい合図」と誤認して勝手にロールし始めないよう、
+  // マウント時点の値を初期値にしておく(0固定だと既存のtrigger値と食い違い、
+  // ボタンを押していないのに追加したサイコロだけ単独で動いてしまう)。
+  const lastTrigger = useRef(trigger);
+  const lastAlignSignal = useRef(alignSignal);
+  // こちらは逆に0固定のままにする。新しく追加されたサイコロもレイアウト変更の
+  // 合図(layoutSignal、マウント時点で既に親側が更新済み)を「未処理」として
+  // 受け取り、既存のサイコロと一緒に少し上から落ちてきてほしいため。
+  const lastLayoutSignal = useRef(0);
   const rolling = useRef(false);
   const stillTime = useRef(0);
+  const rollElapsed = useRef(0);
   // 静止はしたが、まだ整列指示(alignSignal)を待っている間の情報を保持しておく。
   const pendingAlign = useRef<{
     fromX: number;
@@ -205,9 +221,27 @@ function Die({
     );
     rolling.current = true;
     stillTime.current = 0;
+    rollElapsed.current = 0;
     align.current.active = false;
     pendingAlign.current = null;
   }, [trigger, idlePos]);
+
+  // layoutSignalが変化した = 個数が変わってグリッド配置(idlePos)が変わった合図。
+  // ロール中でなければ、既存のサイコロも新しく追加されたサイコロも一緒に、
+  // 初回マウント時と全く同じREST_Y位置に置き直す。ページを開いた時にサイコロが
+  // 少しだけ落下して見えるのはこの位置(RigidBody初期position)がまさにこれで、
+  // 床コライダーとの隙間の分だけ重力で自然に落ちるため。同じ高さにすることで
+  // 個数変更時も全く同じ落ち方になる。
+  useEffect(() => {
+    if (layoutSignal === lastLayoutSignal.current) return;
+    lastLayoutSignal.current = layoutSignal;
+    const body = bodyRef.current;
+    if (!body || rolling.current) return;
+
+    body.setTranslation({ x: idlePos[0], y: REST_Y, z: idlePos[1] }, true);
+    body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+  }, [layoutSignal, idlePos]);
 
   // alignSignalが変化した = 「全てのサイコロが静止した」合図。ここで初めて
   // 整列位置へのスライドを開始する(静止した瞬間に個別に動き出すと、まだ
@@ -225,6 +259,7 @@ function Die({
     if (!body) return;
 
     if (rolling.current) {
+      rollElapsed.current += delta;
       const lv = body.linvel();
       const av = body.angvel();
       const linSpeed = Math.hypot(lv.x, lv.y, lv.z);
@@ -232,36 +267,41 @@ function Die({
 
       if (linSpeed < SETTLE_LIN_SPEED && angSpeed < SETTLE_ANG_SPEED) {
         stillTime.current += delta;
-        if (stillTime.current >= SETTLE_HOLD) {
-          const r = body.rotation();
-          const quat = new THREE.Quaternion(r.x, r.y, r.z, r.w);
-          const value = valueFromQuaternion(quat);
-
-          // 物理演算の姿勢(角度)はそのまま採用する(意図的に補正しない)。
-          // ただし物理ソルバーの許容誤差でわずかに床にめり込む/浮くことがあるため、
-          // 現在の傾きのまま最下点がちょうど床面(y=0)に接するようYだけ補正する。
-          let minY = Infinity;
-          const v = new THREE.Vector3();
-          const pos = geometry.getAttribute("position");
-          for (let i = 0; i < pos.count; i += 1) {
-            v.fromBufferAttribute(pos, i).applyQuaternion(quat);
-            if (v.y < minY) minY = v.y;
-          }
-          const t = body.translation();
-          body.setTranslation({ x: t.x, y: -minY, z: t.z }, true);
-          body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-          body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-
-          rolling.current = false;
-          onSettle(index, value);
-          // 整列はまだ開始しない。全てのサイコロが静止し、alignSignalが来てから
-          // 一斉にスライドを始めるため、ここでは情報を保持するだけにする。
-          // (傾いたままの姿勢からalignedQuaternionへ滑らかにスライドする過程で
-          // 自然と真っ直ぐに揃う。)
-          pendingAlign.current = { fromX: t.x, fromZ: t.z, fromQuat: quat.clone(), toQuat: alignedQuaternion(value) };
-        }
       } else {
         stillTime.current = 0;
+      }
+
+      // 個数が多いと他のサイコロとの接触で速度が閾値をわずかに超え続け、
+      // 自前の閾値判定だけではいつまでも「静止」と判定できないことがある
+      // (=個数によって結果が確定せず固まって見える不具合)。MAX_ROLL_DURATIONを
+      // 超えたら、まだ揺れていてもその時点の姿勢で強制的に確定させる。
+      if (stillTime.current >= SETTLE_HOLD || rollElapsed.current >= MAX_ROLL_DURATION) {
+        const r = body.rotation();
+        const quat = new THREE.Quaternion(r.x, r.y, r.z, r.w);
+        const value = valueFromQuaternion(quat);
+
+        // 物理演算の姿勢(角度)はそのまま採用する(意図的に補正しない)。
+        // ただし物理ソルバーの許容誤差でわずかに床にめり込む/浮くことがあるため、
+        // 現在の傾きのまま最下点がちょうど床面(y=0)に接するようYだけ補正する。
+        let minY = Infinity;
+        const v = new THREE.Vector3();
+        const pos = geometry.getAttribute("position");
+        for (let i = 0; i < pos.count; i += 1) {
+          v.fromBufferAttribute(pos, i).applyQuaternion(quat);
+          if (v.y < minY) minY = v.y;
+        }
+        const t = body.translation();
+        body.setTranslation({ x: t.x, y: -minY, z: t.z }, true);
+        body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+
+        rolling.current = false;
+        onSettle(index, value);
+        // 整列はまだ開始しない。全てのサイコロが静止し、alignSignalが来てから
+        // 一斉にスライドを始めるため、ここでは情報を保持するだけにする。
+        // (傾いたままの姿勢からalignedQuaternionへ滑らかにスライドする過程で
+        // 自然と真っ直ぐに揃う。)
+        pendingAlign.current = { fromX: t.x, fromZ: t.z, fromQuat: quat.clone(), toQuat: alignedQuaternion(value) };
       }
       return;
     }
@@ -331,16 +371,39 @@ export default function DiceScene({
   // 値が変わるたびに「全サイコロが静止したので整列を始めてよい」という合図として
   // 各Dieに配る(全員が同時にスライドを始められるよう、1箇所に揃うのを待つ)。
   const [alignSignal, setAlignSignal] = useState(0);
+  // 個数が変わって配置(idlePositions)が変わるたびに増える合図。既存・新規を問わず
+  // 全サイコロに配り、少し上から落として新しいグリッド位置へ収めさせる。
+  const [layoutSignal, setLayoutSignal] = useState(0);
+  const prevCount = useRef(count);
+  // インラインオブジェクトのままだと再レンダーのたびにR3Fが新しいcamera propと
+  // 見なし、ResponsiveCameraが設定した位置/fovを毎回基準値へ引き戻してしまう
+  // (RouletteScene参照)。ダイスは着地・整列のたびにstate更新が起きるため
+  // 特に影響が大きい。参照を固定してそれを防ぐ。
+  const initialCamera = useMemo(() => ({ position: [0, 7.6, 7.6] as [number, number, number], fov: 42 }), []);
 
   useEffect(() => {
     resultsRef.current = Array(count).fill(null);
   }, [count, trigger]);
 
-  // まだ一度も振っていない間の初期配置(横一列)。ロール中・後の位置は物理演算に任せる。
-  const idlePositions = useMemo<[number, number][]>(
-    () => Array.from({ length: count }, (_, i) => [(i - (count - 1) / 2) * 1.2, 0]),
-    [count]
-  );
+  useEffect(() => {
+    if (prevCount.current === count) return;
+    prevCount.current = count;
+    setLayoutSignal((s) => s + 1);
+  }, [count]);
+
+  // まだ一度も振っていない間の初期配置。個数が多いと横一列に詰め込むと落下軌道が
+  // 重なって空中衝突・積み重なりが増える(=着地位置が不自然に高く見える)ため、
+  // 1行あたり最大3個までにして必要なら複数行に折り返す。
+  const idlePositions = useMemo<[number, number][]>(() => {
+    const cols = Math.min(count, 3);
+    const rows = Math.ceil(count / cols);
+    const spacing = 1.2;
+    return Array.from({ length: count }, (_, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      return [(col - (cols - 1) / 2) * spacing, (row - (rows - 1) / 2) * spacing];
+    });
+  }, [count]);
 
   const handleSettle = (index: number, value: number) => {
     if (resultsRef.current.length !== count) return;
@@ -357,7 +420,8 @@ export default function DiceScene({
   };
 
   return (
-    <Canvas shadows camera={{ position: [0, 7.6, 7.6], fov: 42 }} gl={{ alpha: true, antialias: true }} dpr={[1, 2]}>
+    <Canvas shadows camera={initialCamera} gl={{ alpha: true, antialias: true }} dpr={[1, 2]}>
+      <ResponsiveCamera baseFov={42} referenceAspect={672 / 560} basePosition={[0, 7.6, 7.6]} pushBackStrength={-1} />
       <ambientLight intensity={0.7} />
       <directionalLight
         position={[4, 8, 3]}
@@ -385,6 +449,7 @@ export default function DiceScene({
               idlePos={idlePositions[i]}
               trigger={trigger}
               alignSignal={alignSignal}
+              layoutSignal={layoutSignal}
               onSettle={handleSettle}
             />
           ))}

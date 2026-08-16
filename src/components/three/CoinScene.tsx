@@ -8,6 +8,7 @@ import { sideFromQuaternion, type CoinSide } from "@/lib/coin3d";
 import { buildCoinTextures } from "@/lib/coinTexture";
 import { buildCasinoFeltTexture } from "@/lib/casinoFeltTexture";
 import { playCoinClink, playCoinFlop, playCoinResultChime, playCoinTossFlick, startCoinSpinHum } from "@/lib/coinAudio";
+import ResponsiveCamera from "@/components/three/ResponsiveCamera";
 
 // コインの寸法。見た目の厚み(存在感を出すため実際より厚めにしている)と、
 // 当たり判定用の厚み(薄いまま、転がり方や安定のしやすさはこれまで通り)を
@@ -355,6 +356,10 @@ export default function CoinScene({
   // フォールバック表示に切り替え、EffectComposerが失効後のコンテキストに
   // 触れる前に止める。
   const [contextLost, setContextLost] = useState(false);
+  // インラインオブジェクトのままだと再レンダーのたびにR3Fが新しいcamera propと
+  // 見なし、ResponsiveCameraが設定した位置/fovを毎回基準値へ引き戻してしまう
+  // (RouletteScene参照)。参照を固定してそれを防ぐ。
+  const initialCamera = useMemo(() => ({ position: [0, 7.6, 7.6] as [number, number, number], fov: 42 }), []);
 
   if (contextLost) {
     return (
@@ -376,7 +381,7 @@ export default function CoinScene({
 
   return (
     <Canvas
-      camera={{ position: [0, 7.6, 7.6], fov: 42 }}
+      camera={initialCamera}
       gl={{ alpha: true, antialias: false }}
       dpr={1}
       onCreated={({ gl }) => {
@@ -386,6 +391,7 @@ export default function CoinScene({
         });
       }}
     >
+      <ResponsiveCamera baseFov={42} referenceAspect={672 / 560} basePosition={[0, 7.6, 7.6]} />
       <ambientLight intensity={0.6} color="#fff2df" />
       <directionalLight position={[6, 10, 5]} intensity={1.25} color="#fff4e0" />
       <pointLight position={[-3, 3, 3]} intensity={0.45} color="#fde68a" />

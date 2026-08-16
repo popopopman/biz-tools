@@ -33,7 +33,7 @@ export const tools: ToolMeta[] = [
     shortName: "ガチャ",
     emoji: "🔮",
     description: "参加者リストから順番や当選者を重複なく抽選。席替えや発表順決めに。",
-    accent: "#059669",
+    accent: "#0891b2",
   },
   {
     slug: "dice",

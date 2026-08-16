@@ -63,7 +63,7 @@ export default function RouletteTool() {
 
   return (
     <div className="flex flex-col items-center gap-6">
-      <div className="relative h-[560px] w-full max-w-4xl overflow-hidden rounded-2xl border border-emerald-400/20 bg-gradient-to-b from-emerald-500/[.06] to-transparent">
+      <div className="relative h-[380px] w-full max-w-2xl overflow-hidden rounded-2xl border border-emerald-400/20 bg-gradient-to-b from-emerald-500/[.06] to-transparent sm:h-[560px]">
         <RouletteScene items={items} spinToken={spinToken} onResult={handleResult} />
         {/* 着地の瞬間に画面全体を一瞬光らせるフラッシュ。resultTokenが変わるたびに再生される。 */}
         {winner && (

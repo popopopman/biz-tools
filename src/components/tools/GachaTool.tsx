@@ -101,7 +101,7 @@ export default function GachaTool() {
   return (
     <div className="flex flex-col items-center gap-6">
       <div className="flex w-full max-w-2xl flex-col items-center gap-4">
-        <div className="h-[480px] w-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[.04] to-transparent">
+        <div className="h-[360px] w-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[.04] to-transparent sm:h-[480px]">
           <GachaScene capacity={capacity} drawnCount={drawn.length} drawn={drawn} />
         </div>
 
@@ -119,7 +119,7 @@ export default function GachaTool() {
           <button
             onClick={drawOne}
             disabled={!started || (pool?.length ?? 0) === 0 || revealing}
-            className="glow-btn flex-1 rounded-lg bg-emerald-600 px-4 py-2.5 font-medium text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="glow-btn flex-1 rounded-lg bg-cyan-600 px-4 py-2.5 font-medium text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             1件引く
           </button>
@@ -149,7 +149,7 @@ export default function GachaTool() {
           <button
             onClick={startDraw}
             disabled={items.length < 2}
-            className="glow-btn mt-3 w-full rounded-lg bg-emerald-600 px-6 py-2.5 font-medium text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="glow-btn mt-3 w-full rounded-lg bg-cyan-600 px-6 py-2.5 font-medium text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             ガチャを準備する
           </button>
@@ -169,7 +169,7 @@ export default function GachaTool() {
                 key={`${name}-${i}`}
                 className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
               >
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white">
                   {i + 1}
                 </span>
                 {name}

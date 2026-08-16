@@ -52,6 +52,13 @@ body::before {
   -webkit-backdrop-filter: blur(18px);
 }
 
+/* ヘッダーはスクロール中ずっとコンテンツの上に乗り続けるため、.glass-cardの
+   薄い透過(4.5%)のままだとブラーだけでは文字が透けて読みづらい。背景を
+   ほぼ不透明にして視認性を優先する。 */
+.site-header {
+  background: rgba(6, 8, 16, 0.92);
+}
+
 .glow-text {
   background: linear-gradient(120deg, #a5b4fc, #f0abfc 45%, #fca5a5 90%);
   -webkit-background-clip: text;
